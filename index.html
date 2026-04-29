@@ -632,23 +632,41 @@ async function syncRemote(){
 
 async function carregarDoFirebase(){
   try{
-    // Desabilitar cache do Firestore para sempre buscar dados frescos
-    db.settings({ cacheSizeBytes: firebase.firestore.CACHE_SIZE_UNLIMITED });
     const ref=db.collection('crm').doc('dados');
-    // force server fetch ignorando cache local
     const doc=await ref.get({ source: 'server' });
     if(doc.exists){
       const d=doc.data();
-      // Firebase é sempre a fonte de verdade — sobrescreve tudo
       if(d.clientes){ clientes=JSON.parse(d.clientes); }
       if(d.deals){ deals=JSON.parse(d.deals); }
       if(d.tarefas){ tarefas=JSON.parse(d.tarefas); }
       if(d.usuarios){ usuarios=JSON.parse(d.usuarios); vendedores=usuarios.filter(u=>u.role!=='gestor'); }
+      limparDadosDeOutrosVendedores();
       saveLocal();
       return true;
     }
   }catch(e){ console.log('Firebase load error:',e); }
   return false;
+}
+
+function limparDadosDeOutrosVendedores(){
+  if(!CFG.nome||CFG.role==='gestor'||CFG.role==='gerente') return;
+  // Remove deals em andamento de clientes vinculados a outro vendedor
+  deals=deals.filter(d=>{
+    if(d.etapa==='ganho'||d.etapa==='perdido') return true;
+    if(d.vendedor===CFG.nome) return true;
+    const c=clientes.find(x=>x.id===d.clienteId);
+    if(!c) return true;
+    if(c.vendedor&&c.vendedor!==CFG.nome) return false;
+    return true;
+  });
+  // Remove tarefas de clientes vinculados a outro vendedor
+  tarefas=tarefas.filter(t=>{
+    if(t.vendedor!==CFG.nome) return true;
+    const c=clientes.find(x=>x.id===t.clienteId);
+    if(!c) return true;
+    if(c.vendedor&&c.vendedor!==CFG.nome) return false;
+    return true;
+  });
 }
 
 function seedDemoData(){
@@ -724,7 +742,7 @@ function nav(name,btn){
   btn.classList.add('active');
   renderAll();
 }
-function renderAll(){ renderFunil(); renderTarefas(); renderClientes(); renderDashboard(); renderVendedores(); populaFiltros(); atualizarBadgeTarefas(); renderConfig(); }
+function renderAll(){ limparDadosDeOutrosVendedores(); renderFunil(); renderTarefas(); renderClientes(); renderDashboard(); renderVendedores(); populaFiltros(); atualizarBadgeTarefas(); renderConfig(); }
 
 // ══════════════════════════════════════════════════════════
 //  FUNIL
