@@ -3,6 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <title>CRM</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
@@ -482,10 +485,9 @@ const STATUS_CLIENTE=['CLIENTE ATIVO','CLIENTE INATIVO','LEADS'];
 window.onload=()=>{
   // Limpar dados de versões anteriores que possam conflitar
   const versao=localStorage.getItem('crm6_versao');
-  if(versao!=='13.0'){
-    localStorage.removeItem('crm6_usuarios');
+  if(versao!=='13.1'){
     localStorage.removeItem('crm6_session');
-    localStorage.setItem('crm6_versao','13.0');
+    localStorage.setItem('crm6_versao','13.1');
   }
   usuarios=JSON.parse(localStorage.getItem('crm6_usuarios')||'[]');
   deals=JSON.parse(localStorage.getItem('crm6_deals')||'[]');
