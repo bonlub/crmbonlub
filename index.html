@@ -256,7 +256,7 @@ tbody tr:hover td{background:var(--surface2);}
     <div class="login-logo">CRM</div>
     <div class="login-sub">Acesse sua conta</div>
     <label>URL Google Apps Script (opcional)</label>
-    <input id="lg-url" value="https://script.google.com/macros/s/AKfycbxHXAD-gNZUWvGiAPfbJ4623z9YJrRlHdeXDsuu5hqYVEhBq_QIsvR5by2kOsXnLey3/exec" style="text-transform:none">
+    <input id="lg-url" value="https://script.google.com/macros/s/AKfycbwSqWmWVktuUkXPQ_SwIMM_Va3oW90RXX46ArupNo3eGVuGKLEL_KbaIFXj0ZTWSw68/exec" style="text-transform:none">
     <label>Usuário</label>
     <input id="lg-user" placeholder="Seu nome" style="text-transform:none" oninput="this.value=this.value.replace(/[^a-zA-Z\s]/g,'')">
     <label>Senha</label>
@@ -519,7 +519,7 @@ window.onload=()=>{
   tarefas=JSON.parse(localStorage.getItem('crm6_tarefas')||'[]');
   if(!usuarios.length) seedUsuarios();
   // Tentar sincronizar usuários do Sheets para preservar senhas
-  const URL_FIXED='https://script.google.com/macros/s/AKfycbxHXAD-gNZUWvGiAPfbJ4623z9YJrRlHdeXDsuu5hqYVEhBq_QIsvR5by2kOsXnLey3/exec';
+  const URL_FIXED='https://script.google.com/macros/s/AKfycbwSqWmWVktuUkXPQ_SwIMM_Va3oW90RXX46ArupNo3eGVuGKLEL_KbaIFXj0ZTWSw68/exec';
   fetch(URL_FIXED+'?action=getAll').then(r=>r.json()).then(d=>{
     if(d.ok&&d.usuarios&&d.usuarios.length){
       // Mescla: mantém dados locais mas atualiza senhas vindas do Sheets
@@ -639,12 +639,8 @@ function saveLocal(){
 async function syncRemote(){
   if(!CFG.url) return;
   try{
-    await fetch(CFG.url, {
-      method:'POST',
-      mode:'no-cors',
-      body:JSON.stringify({action:'sync',deals,clientes,vendedores:usuarios,tarefas}),
-      headers:{'Content-Type':'text/plain'}
-    });
+    const payload=encodeURIComponent(JSON.stringify({deals,clientes,usuarios,tarefas}));
+    await fetch(`${CFG.url}?action=sync&data=${payload}`,{method:'GET',mode:'no-cors'});
   }catch(e){}
 }
 
