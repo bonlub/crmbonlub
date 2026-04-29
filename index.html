@@ -7,7 +7,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>CRM</title>
-<script type="module">
+<script>
 (function(){
   const url=new URL(window.location.href);
   const stored=localStorage.getItem('crm_build');
@@ -21,21 +21,7 @@
   }
 })();
 </script>
-<!-- Firebase SDK -->
-<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
-<script>
-const firebaseConfig = {
-  apiKey: "AIzaSyCrlZS_33Pr8nAdsOEXY2LHAaSfkgYRDwM",
-  authDomain: "crmbonlub.firebaseapp.com",
-  projectId: "crmbonlub",
-  storageBucket: "crmbonlub.firebasestorage.app",
-  messagingSenderId: "908874938013",
-  appId: "1:908874938013:web:b75c57d24bd5529477c674"
-};
-firebase.initializeApp(firebaseConfig);
-const db = firebase.firestore();
-</script>
+<!-- Firebase carrega no final do body -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap');
@@ -265,8 +251,6 @@ tbody tr:hover td{background:var(--surface2);}
   <div class="login-card">
     <div class="login-logo">CRM</div>
     <div class="login-sub">Acesse sua conta</div>
-    <label>URL Google Apps Script (opcional)</label>
-    <input id="lg-url" value="https://script.google.com/macros/s/AKfycbwSqWmWVktuUkXPQ_SwIMM_Va3oW90RXX46ArupNo3eGVuGKLEL_KbaIFXj0ZTWSw68/exec" style="text-transform:none">
     <label>Usuário</label>
     <input id="lg-user" placeholder="Seu nome" style="text-transform:none" oninput="this.value=this.value.replace(/[^a-zA-Z\s]/g,'')">
     <label>Senha</label>
@@ -528,8 +512,7 @@ window.onload=()=>{
   vendedores=JSON.parse(localStorage.getItem('crm6_vendors')||'[]');
   tarefas=JSON.parse(localStorage.getItem('crm6_tarefas')||'[]');
   if(!usuarios.length) seedUsuarios();
-  const sess=localStorage.getItem('crm6_session');
-  if(sess){ CFG=JSON.parse(sess); iniciarApp(); }
+  // iniciarApp() é chamado pelo script do Firebase no final do body
 };
 
 function seedUsuarios(){
@@ -546,10 +529,9 @@ function seedUsuarios(){
 function fazerLogin(){
   const nome=document.getElementById('lg-user').value.trim().toUpperCase();
   const senha=document.getElementById('lg-pass').value;
-  const url=document.getElementById('lg-url').value.trim();
   const u=usuarios.find(x=>x.nome===nome);
   if(!u||u.senha!==senha){ toast('Usuário ou senha incorretos.','err'); return; }
-  CFG={nome:u.nome,role:u.role,url};
+  CFG={nome:u.nome,role:u.role};
   localStorage.setItem('crm6_session',JSON.stringify(CFG));
   if(u.primeiroacesso){ pedirNovaSenha(u); return; }
   iniciarApp();
@@ -1802,6 +1784,24 @@ function fmtDate(d){ if(!d) return ''; try{ const [y,m,dd]=String(d).split('-');
 function uid(){ return Math.random().toString(36).slice(2,9)+Date.now().toString(36); }
 function initials(nome){ return (nome||'').split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase(); }
 function normalize(s){ return (s||'').toUpperCase().replace(/[^A-Z0-9]/g,''); }
+</script>
+<!-- Firebase SDK - carrega por último para garantir disponibilidade -->
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+<script>
+const firebaseConfig={
+  apiKey:"AIzaSyCrlZS_33Pr8nAdsOEXY2LHAaSfkgYRDwM",
+  authDomain:"crmbonlub.firebaseapp.com",
+  projectId:"crmbonlub",
+  storageBucket:"crmbonlub.firebasestorage.app",
+  messagingSenderId:"908874938013",
+  appId:"1:908874938013:web:b75c57d24bd5529477c674"
+};
+firebase.initializeApp(firebaseConfig);
+window.db=firebase.firestore();
+// Iniciar app após Firebase estar pronto
+const _sess=localStorage.getItem('crm6_session');
+if(_sess){ CFG=JSON.parse(_sess); iniciarApp(); }
 </script>
 </body>
 </html>
