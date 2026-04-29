@@ -249,7 +249,7 @@ tbody tr:hover td{background:var(--surface2);}
 <!-- LOGIN -->
 <div id="login-screen">
   <div class="login-card">
-    <div class="login-logo">CRM <span style="font-size:12px;font-weight:400;color:var(--text3)">v14.6</span></div>
+    <div class="login-logo">CRM <span style="font-size:12px;font-weight:400;color:var(--text3)">v14.7</span></div>
     <div class="login-sub">Acesse sua conta</div>
     <label>Usuário</label>
     <input id="lg-user" placeholder="Seu nome" style="text-transform:none" oninput="this.value=this.value.replace(/[^a-zA-Z\s]/g,'')">
@@ -264,7 +264,7 @@ tbody tr:hover td{background:var(--surface2);}
 <div id="app">
   <div class="topbar">
     <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-      <span class="topbar-logo">CRM <span style="font-size:10px;font-weight:400;color:var(--text3)">v14.6</span></span>
+      <span class="topbar-logo">CRM <span style="font-size:10px;font-weight:400;color:var(--text3)">v14.7</span></span>
       <nav class="nav">
         <button class="nav-btn active" onclick="nav('funil',this)">Funil</button>
         <button class="nav-btn" onclick="nav('tarefas',this)" id="btn-nav-tarefas">Tarefas<span class="nav-badge" id="badge-tarefas" style="display:none">0</span></button>
@@ -370,9 +370,9 @@ tbody tr:hover td{background:var(--surface2);}
       <div class="table-wrap">
         <table>
           <colgroup>
-            <col style="width:8%"><col style="width:5%"><col style="width:13%"><col style="width:9%"><col style="width:9%">
-            <col style="width:8%"><col style="width:8%"><col style="width:9%"><col style="width:8%">
-            <col style="width:7%"><col style="width:7%"><col style="width:9%">
+            <col style="width:8%"><col style="width:4%"><col style="width:14%"><col style="width:9%"><col style="width:8%">
+            <col style="width:7%"><col style="width:7%"><col style="width:7%"><col style="width:7%">
+            <col style="width:7%"><col style="width:6%"><col style="width:9%">
           </colgroup>
           <thead><tr><th>Ações</th><th>Cód.</th><th>Razão Social</th><th>Nome Fantasia</th><th>CNPJ/CPF</th><th>WhatsApp</th><th>Telefone</th><th>E-mail</th><th>Contato</th><th>Cidade/UF</th><th>Status</th><th>Vendedor</th></tr></thead>
           <tbody id="tbody-c"></tbody>
@@ -1251,7 +1251,7 @@ function renderClientes(){
       <td style="font-size:11px;color:var(--text2)">${esc(c.cnpj||'—')}</td>
       <td>${esc(c.whatsapp||'—')}</td>
       <td>${esc(c.tel||'—')}</td>
-      <td style="color:var(--text2)">${esc(c.email||'—')}</td>
+      <td style="color:var(--text2);max-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(c.email||'')}">${esc(c.email||'—')}</td>
       <td>${esc(c.contato||'—')}</td>
       <td style="font-size:11px">${esc((c.cidade||'')+(c.estado?'/'+c.estado:''))}</td>
       <td><span class="badge badge-${statusCls}">${c.status||'LEADS'}</span></td>
