@@ -482,14 +482,10 @@ const STATUS_CLIENTE=['CLIENTE ATIVO','CLIENTE INATIVO','LEADS'];
 window.onload=()=>{
   // Limpar dados de versões anteriores que possam conflitar
   const versao=localStorage.getItem('crm6_versao');
-  if(versao!=='12.0'){
+  if(versao!=='13.0'){
     localStorage.removeItem('crm6_usuarios');
     localStorage.removeItem('crm6_session');
-    localStorage.removeItem('crm6_deals');
-    localStorage.removeItem('crm6_clientes');
-    localStorage.removeItem('crm6_vendors');
-    localStorage.removeItem('crm6_tarefas');
-    localStorage.setItem('crm6_versao','12.0');
+    localStorage.setItem('crm6_versao','13.0');
   }
   usuarios=JSON.parse(localStorage.getItem('crm6_usuarios')||'[]');
   deals=JSON.parse(localStorage.getItem('crm6_deals')||'[]');
@@ -1584,36 +1580,67 @@ function mostrarMapeamento(){
         ${CAMPOS_IMP.map(o=>`<option ${autoMapI(String(h))===o?'selected':''}>${o}</option>`).join('')}
       </select></div>`).join('')}
     <p style="font-size:12px;color:var(--text3);margin:10px 0 6px">${importData.length} registros</p>
-    <div style="display:flex;gap:8px;margin-top:.75rem">
+    <div style="display:flex;gap:8px;margin-top:.75rem;flex-wrap:wrap">
       <button class="btn-outline" onclick="resetImport()">Cancelar</button>
-      <button class="btn-primary" onclick="confirmarImport()">Importar ${importData.length}</button>
-    </div>`;
+      <button class="btn-primary" onclick="confirmarImport('novo')">Importar novos</button>
+      ${CFG.role==='gestor'?`<button class="btn-primary" style="background:#5B21B6;border-color:#5B21B6" onclick="confirmarImport('atualizar')" title="Atualiza campos dos clientes já existentes pela Razão Social ou Cod. Cliente">Atualizar existentes</button>`:''}
+    </div>
+    <p style="font-size:11px;color:var(--text3);margin-top:8px"><strong>Importar novos</strong> — só adiciona clientes que ainda não existem.<br><strong>Atualizar existentes</strong> — preenche campos vazios (telefone, e-mail etc.) nos clientes já cadastrados, sem criar duplicatas.</p>`;
 }
 
-function confirmarImport(){
+function confirmarImport(modo='novo'){
   const mapa=importHeaders.map((_,i)=>document.getElementById(`mp-${i}`).value);
-  let n=0, skip=0;
+  let n=0, atualizados=0, skip=0;
   const statusValidos=['CLIENTE ATIVO','CLIENTE INATIVO','LEADS'];
+
   importData.forEach(row=>{
     const obj={status:'LEADS',global:true,vendedor:'',dataVinculo:'',cadastradoPor:'importação',codCliente:'',reativacoes:0};
     mapa.forEach((campo,i)=>{ const val=String(row[i]||'').trim().toUpperCase(); const key=CMAP[campo]; if(key) obj[key]=val; });
     if(!obj.razaoSocial){ skip++; return; }
-    // Gestor: respeita status da planilha se válido; outros: sempre LEADS
+
     if(CFG.role==='gestor'){
       if(!statusValidos.includes(obj.status)) obj.status='LEADS';
     } else {
       obj.status='LEADS';
     }
-    // Validações de duplicata
+
+    // Modo ATUALIZAR — busca cliente existente e preenche campos vazios
+    if(modo==='atualizar'){
+      // Tenta encontrar pelo cod, cnpj ou razão social
+      let existing = null;
+      if(obj.codCliente) existing=clientes.find(c=>c.codCliente&&normalize(c.codCliente)===normalize(obj.codCliente));
+      if(!existing&&obj.cnpj) existing=clientes.find(c=>c.cnpj&&normalize(c.cnpj)===normalize(obj.cnpj));
+      if(!existing) existing=clientes.find(c=>normalize(c.razaoSocial)===normalize(obj.razaoSocial));
+
+      if(existing){
+        // Preenche apenas campos que estão vazios no cadastro atual
+        const campos=['tel','tel2','tel3','email','email2','whatsapp','contato','cidade','estado','nomeFantasia','obs'];
+        campos.forEach(k=>{ if(!existing[k]&&obj[k]) existing[k]=obj[k]; });
+        // Cod cliente: atualiza se estava vazio
+        if(!existing.codCliente&&obj.codCliente) existing.codCliente=obj.codCliente;
+        atualizados++;
+      } else {
+        skip++; // não encontrou para atualizar
+      }
+      return;
+    }
+
+    // Modo NOVO — validações de duplicata normais
     if(obj.codCliente&&clientes.find(c=>c.codCliente&&normalize(c.codCliente)===normalize(obj.codCliente))){ skip++; return; }
     if(obj.cnpj&&obj.cnpj.replace(/\D/g,'').length>11&&clientes.find(c=>c.cnpj&&normalize(c.cnpj)===normalize(obj.cnpj))){ skip++; return; }
     if(clientes.find(c=>normalize(c.razaoSocial)===normalize(obj.razaoSocial))){ skip++; return; }
     if(obj.nomeFantasia&&clientes.find(c=>c.nomeFantasia&&normalize(c.nomeFantasia)===normalize(obj.nomeFantasia))){ skip++; return; }
     clientes.push({id:uid(),...obj}); n++;
   });
+
   saveLocal(); syncRemote();
-  document.getElementById('import-result').style.display='block';
-  document.getElementById('import-result').textContent=`${n} clientes importados.${skip>0?` ${skip} ignorados por duplicata.`:''}`;
+  const el=document.getElementById('import-result');
+  el.style.display='block';
+  if(modo==='atualizar'){
+    el.textContent=`${atualizados} clientes atualizados.${skip>0?` ${skip} não encontrados.`:''}`;
+  } else {
+    el.textContent=`${n} clientes importados.${skip>0?` ${skip} ignorados por duplicata.`:''}`;
+  }
   document.getElementById('import-body').innerHTML='';
   importData=[]; importHeaders=[]; renderClientes();
 }
