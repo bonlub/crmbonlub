@@ -619,7 +619,14 @@ function saveLocal(){
 }
 async function syncRemote(){
   if(!CFG.url) return;
-  try{ await fetch(CFG.url+'?action=sync',{method:'POST',body:JSON.stringify({deals,clientes,vendedores,tarefas}),headers:{'Content-Type':'text/plain'}}); }catch(e){}
+  try{
+    await fetch(CFG.url, {
+      method:'POST',
+      mode:'no-cors',
+      body:JSON.stringify({action:'sync',deals,clientes,vendedores:usuarios,tarefas}),
+      headers:{'Content-Type':'text/plain'}
+    });
+  }catch(e){}
 }
 
 function seedDemoData(){
