@@ -141,7 +141,7 @@ input::placeholder,select option{text-transform:none;}
 .table-wrap{background:var(--surface);border:0.5px solid var(--border);border-radius:var(--radius-lg);overflow-x:auto;}
 table{width:100%;border-collapse:collapse;font-size:12px;}
 thead th{padding:9px 12px;text-align:left;font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;border-bottom:0.5px solid var(--border);background:var(--surface2);white-space:nowrap;}
-tbody td{padding:8px 12px;border-bottom:0.5px solid var(--border);vertical-align:middle;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:0;}
+tbody td{padding:8px 12px;border-bottom:0.5px solid var(--border);vertical-align:middle;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 tbody tr:last-child td{border-bottom:none;}
 tbody tr:hover td{background:var(--surface2);}
 .empty-td{text-align:center;color:var(--text3);padding:2.5rem;}
@@ -1208,8 +1208,8 @@ function renderClientes(){
       <td style="font-size:11px">${esc((c.cidade||'')+(c.estado?'/'+c.estado:''))}</td>
       <td><span class="badge badge-${statusCls}">${c.status||'LEADS'}</span></td>
       <td style="font-size:11px;color:var(--text3)">${esc(c.vendedor||'—')}</td>
-      <td style="display:flex;gap:3px;flex-wrap:wrap">
-        ${podeEditar?`<button class="btn-sm" onclick="abrirCliente('${c.id}')">Editar</button>`:''}
+      <td style="white-space:nowrap">
+        ${podeEditar?`<button class="btn-sm" onclick="abrirCliente('${c.id}')">Editar</button> `:''}
         ${temHist?`<button class="btn-sm" onclick="verHistCliente('${c.id}')">Hist.</button>`:''}
         ${podeExcluir?`<button class="btn-sm" style="color:#881337" onclick="deletarCliente('${c.id}')">×</button>`:''}
       </td>
