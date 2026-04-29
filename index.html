@@ -370,11 +370,11 @@ tbody tr:hover td{background:var(--surface2);}
       <div class="table-wrap">
         <table>
           <colgroup>
-            <col style="width:5%"><col style="width:14%"><col style="width:10%"><col style="width:9%">
+            <col style="width:8%"><col style="width:5%"><col style="width:13%"><col style="width:9%"><col style="width:9%">
             <col style="width:8%"><col style="width:8%"><col style="width:9%"><col style="width:8%">
-            <col style="width:7%"><col style="width:7%"><col style="width:7%"><col style="width:8%">
+            <col style="width:7%"><col style="width:7%"><col style="width:9%">
           </colgroup>
-          <thead><tr><th>Cód.</th><th>Razão Social</th><th>Nome Fantasia</th><th>CNPJ/CPF</th><th>WhatsApp</th><th>Telefone</th><th>E-mail</th><th>Contato</th><th>Cidade/UF</th><th>Status</th><th>Vendedor</th><th></th></tr></thead>
+          <thead><tr><th>Ações</th><th>Cód.</th><th>Razão Social</th><th>Nome Fantasia</th><th>CNPJ/CPF</th><th>WhatsApp</th><th>Telefone</th><th>E-mail</th><th>Contato</th><th>Cidade/UF</th><th>Status</th><th>Vendedor</th></tr></thead>
           <tbody id="tbody-c"></tbody>
         </table>
       </div>
@@ -926,7 +926,12 @@ function deletarDeal(id){
 // ══════════════════════════════════════════════════════════
 //  MODAL DEAL
 // ══════════════════════════════════════════════════════════
-function abrirDeal(id=null){
+function abrirDealParaCliente(clienteId){
+  // Abre modal de negócio com cliente pré-selecionado
+  abrirDeal(null, clienteId);
+}
+
+function abrirDeal(id=null, preClienteId=null){
   editDealId=id;
   const d=id?deals.find(x=>x.id===id):{};
   const isGerente=CFG.role==='gerente'; if(isGerente&&!id) return;
@@ -935,7 +940,8 @@ function abrirDeal(id=null){
   const etapaAtual=d.etapa||'contato';
   const finalizado=etapaAtual==='ganho'||etapaAtual==='perdido';
   const hist=d.historico||[];
-  const cAtual=d.clienteId?clientes.find(x=>x.id===d.clienteId):null;
+  const cAtual=d.clienteId?clientes.find(x=>x.id===d.clienteId):(preClienteId?clientes.find(x=>x.id===preClienteId):null);
+  const clienteIdInicial=d.clienteId||preClienteId||'';
 
   modal(`<h3>${id?'Editar negócio':'Novo negócio'}</h3>
     <div class="form-grid">
@@ -944,7 +950,7 @@ function abrirDeal(id=null){
           <input class="ac-input" id="ac-q" placeholder="DIGITE PARA BUSCAR..." autocomplete="off"
             value="${esc(cAtual?cAtual.razaoSocial:'')}" oninput="acBuscar(this.value)" onfocus="acBuscar(this.value)">
           <div class="ac-list" id="ac-list" style="display:none"></div>
-          <input type="hidden" id="fd-clienteId" value="${d.clienteId||''}">
+          <input type="hidden" id="fd-clienteId" value="${clienteIdInicial}">
         </div>
       </div>
       <div class="frow"><label>Valor (R$)</label><input id="fd-valor" type="number" min="0" step="0.01" value="${d.valor||''}"></div>
@@ -1235,6 +1241,10 @@ function renderClientes(){
     const temHist=deals.some(d=>d.clienteId===c.id);
     const statusCls=c.status==='CLIENTE ATIVO'?'ativo':c.status==='CLIENTE INATIVO'?'inativo':'lead';
     return `<tr>
+      <td style="white-space:nowrap">
+        ${CFG.role!=='gerente'?`<button class="btn-sm" style="color:var(--c-text);border-color:var(--c-border);background:var(--c-bg)" onclick="abrirDealParaCliente('${c.id}')">+ Negócio</button> `:''}
+        ${CFG.role!=='gerente'?`<button class="btn-sm" style="color:#5B21B6;border-color:#DDD6FE;background:#F5F3FF" onclick="abrirTarefa(null,'${c.id}')">+ Tarefa</button>`:''}
+      </td>
       <td style="font-family:var(--mono);font-size:11px;color:var(--text3)">${esc(c.codCliente||'—')}</td>
       <td style="font-weight:600">${esc(c.razaoSocial||'—')}</td>
       <td>${esc(c.nomeFantasia||'—')}</td>
@@ -1245,11 +1255,11 @@ function renderClientes(){
       <td>${esc(c.contato||'—')}</td>
       <td style="font-size:11px">${esc((c.cidade||'')+(c.estado?'/'+c.estado:''))}</td>
       <td><span class="badge badge-${statusCls}">${c.status||'LEADS'}</span></td>
-      <td style="font-size:11px;color:var(--text3)">${esc(c.vendedor||'—')}</td>
-      <td style="white-space:nowrap">
-        ${podeEditar?`<button class="btn-sm" onclick="abrirCliente('${c.id}')">Editar</button> `:''}
-        ${temHist?`<button class="btn-sm" onclick="verHistCliente('${c.id}')">Hist.</button>`:''}
-        ${podeExcluir?`<button class="btn-sm" style="color:#881337" onclick="deletarCliente('${c.id}')">×</button>`:''}
+      <td style="font-size:11px;color:var(--text3);white-space:nowrap">
+        ${esc(c.vendedor||'—')}
+        ${podeEditar?` <button class="btn-sm" onclick="abrirCliente('${c.id}')">Editar</button>`:''}
+        ${temHist?` <button class="btn-sm" onclick="verHistCliente('${c.id}')">Hist.</button>`:''}
+        ${podeExcluir?` <button class="btn-sm" style="color:#881337" onclick="deletarCliente('${c.id}')">×</button>`:''}
       </td>
     </tr>`;
   }).join('');
