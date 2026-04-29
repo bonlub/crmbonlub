@@ -7,16 +7,11 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>CRM</title>
-<script>
-// Força recarregar sempre a versão mais recente do GitHub
-if('serviceWorker' in navigator){
-  navigator.serviceWorker.getRegistrations().then(regs=>regs.forEach(r=>r.unregister()));
-}
-// Adiciona timestamp na URL para quebrar cache se vier de link antigo
+<script type="module">
 (function(){
   const url=new URL(window.location.href);
   const stored=localStorage.getItem('crm_build');
-  const build='13';
+  const build='14';
   if(stored!==build){
     localStorage.setItem('crm_build',build);
     if(!url.searchParams.get('v')){
@@ -25,6 +20,21 @@ if('serviceWorker' in navigator){
     }
   }
 })();
+</script>
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyCrlZS_33Pr8nAdsOEXY2LHAaSfkgYRDwM",
+  authDomain: "crmbonlub.firebaseapp.com",
+  projectId: "crmbonlub",
+  storageBucket: "crmbonlub.firebasestorage.app",
+  messagingSenderId: "908874938013",
+  appId: "1:908874938013:web:b75c57d24bd5529477c674"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
@@ -256,7 +266,7 @@ tbody tr:hover td{background:var(--surface2);}
     <div class="login-logo">CRM</div>
     <div class="login-sub">Acesse sua conta</div>
     <label>URL Google Apps Script (opcional)</label>
-    <input id="lg-url" value="https://script.google.com/macros/s/AKfycbyEmSWWw7EKRt1l-wqZrd70xzKhdlrqrropqLy1RgoW7TlpZ9CLcLbg6Fyyc-Q_KIyb/exec" style="text-transform:none">
+    <input id="lg-url" value="https://script.google.com/macros/s/AKfycbwSqWmWVktuUkXPQ_SwIMM_Va3oW90RXX46ArupNo3eGVuGKLEL_KbaIFXj0ZTWSw68/exec" style="text-transform:none">
     <label>Usuário</label>
     <input id="lg-user" placeholder="Seu nome" style="text-transform:none" oninput="this.value=this.value.replace(/[^a-zA-Z\s]/g,'')">
     <label>Senha</label>
@@ -518,20 +528,6 @@ window.onload=()=>{
   vendedores=JSON.parse(localStorage.getItem('crm6_vendors')||'[]');
   tarefas=JSON.parse(localStorage.getItem('crm6_tarefas')||'[]');
   if(!usuarios.length) seedUsuarios();
-  // Tentar sincronizar usuários do Sheets para preservar senhas
-  const URL_FIXED='https://script.google.com/macros/s/AKfycbyEmSWWw7EKRt1l-wqZrd70xzKhdlrqrropqLy1RgoW7TlpZ9CLcLbg6Fyyc-Q_KIyb/exec';
-  fetch(URL_FIXED+'?action=getAll').then(r=>r.json()).then(d=>{
-    if(d.ok&&d.usuarios&&d.usuarios.length){
-      // Mescla: mantém dados locais mas atualiza senhas vindas do Sheets
-      d.usuarios.forEach(u=>{
-        const local=usuarios.find(x=>x.nome===u.nome);
-        if(local){ local.senha=u.senha; local.primeiroacesso=u.primeiroacesso; }
-        else usuarios.push(u);
-      });
-      vendedores=usuarios.filter(u=>u.role!=='gestor');
-      saveLocal();
-    }
-  }).catch(()=>{});
   const sess=localStorage.getItem('crm6_session');
   if(sess){ CFG=JSON.parse(sess); iniciarApp(); }
 };
@@ -623,7 +619,11 @@ function iniciarApp(){
     const el=document.getElementById(id); if(el){ el.value=id.endsWith('-de')||id==='dash-de'?ini:fim; }
   });
   const ts=document.getElementById('t-status'); if(ts) ts.value='andamento';
-  renderAll(); atualizarBadgeTarefas();
+  // Carregar do Firebase (fonte de verdade)
+  carregarDoFirebase().then(carregou=>{
+    if(carregou) toast('Dados sincronizados!','ok');
+    renderAll(); atualizarBadgeTarefas();
+  });
 }
 
 // ══════════════════════════════════════════════════════════
@@ -636,31 +636,37 @@ function saveLocal(){
   localStorage.setItem('crm6_tarefas',JSON.stringify(tarefas));
   localStorage.setItem('crm6_usuarios',JSON.stringify(usuarios));
 }
-function syncRemote(){
-  if(!CFG.url) return;
+// ══════════════════════════════════════════════════════════
+//  FIREBASE SYNC
+// ══════════════════════════════════════════════════════════
+async function syncRemote(){
   try{
-    // Iframe oculto é a única forma garantida de contornar CORS com Apps Script
-    const existente=document.getElementById('sync-frame');
-    if(existente) existente.remove();
-    const form=document.createElement('form');
-    form.method='POST';
-    form.action=CFG.url+'?action=sync';
-    form.target='sync-frame';
-    form.style.display='none';
-    const input=document.createElement('input');
-    input.type='hidden';
-    input.name='data';
-    input.value=JSON.stringify({deals,clientes,usuarios,tarefas});
-    form.appendChild(input);
-    const iframe=document.createElement('iframe');
-    iframe.name='sync-frame';
-    iframe.id='sync-frame';
-    iframe.style.display='none';
-    document.body.appendChild(iframe);
-    document.body.appendChild(form);
-    form.submit();
-    setTimeout(()=>{ form.remove(); },3000);
-  }catch(e){}
+    const ref=db.collection('crm').doc('dados');
+    await ref.set({
+      deals:JSON.stringify(deals),
+      clientes:JSON.stringify(clientes),
+      usuarios:JSON.stringify(usuarios),
+      tarefas:JSON.stringify(tarefas),
+      updatedAt:new Date().toISOString()
+    });
+  }catch(e){ console.log('Firebase sync error:',e); }
+}
+
+async function carregarDoFirebase(){
+  try{
+    const ref=db.collection('crm').doc('dados');
+    const doc=await ref.get();
+    if(doc.exists){
+      const d=doc.data();
+      if(d.clientes){ const c=JSON.parse(d.clientes); if(c.length) clientes=c; }
+      if(d.deals){ const dl=JSON.parse(d.deals); if(dl.length) deals=dl; }
+      if(d.tarefas){ const t=JSON.parse(d.tarefas); if(t.length) tarefas=t; }
+      if(d.usuarios){ const u=JSON.parse(d.usuarios); if(u.length){ usuarios=u; vendedores=usuarios.filter(u=>u.role!=='gestor'); }}
+      saveLocal();
+      return true;
+    }
+  }catch(e){ console.log('Firebase load error:',e); }
+  return false;
 }
 
 function seedDemoData(){
