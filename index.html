@@ -249,7 +249,7 @@ tbody tr:hover td{background:var(--surface2);}
 <!-- LOGIN -->
 <div id="login-screen">
   <div class="login-card">
-    <div class="login-logo">CRM <span style="font-size:12px;font-weight:400;color:var(--text3)">v14.1</span></div>
+    <div class="login-logo">CRM <span style="font-size:12px;font-weight:400;color:var(--text3)">v14.2</span></div>
     <div class="login-sub">Acesse sua conta</div>
     <label>Usuário</label>
     <input id="lg-user" placeholder="Seu nome" style="text-transform:none" oninput="this.value=this.value.replace(/[^a-zA-Z\s]/g,'')">
@@ -264,7 +264,7 @@ tbody tr:hover td{background:var(--surface2);}
 <div id="app">
   <div class="topbar">
     <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-      <span class="topbar-logo">CRM <span style="font-size:10px;font-weight:400;color:var(--text3)">v14.1</span></span>
+      <span class="topbar-logo">CRM <span style="font-size:10px;font-weight:400;color:var(--text3)">v14.2</span></span>
       <nav class="nav">
         <button class="nav-btn active" onclick="nav('funil',this)">Funil</button>
         <button class="nav-btn" onclick="nav('tarefas',this)" id="btn-nav-tarefas">Tarefas<span class="nav-badge" id="badge-tarefas" style="display:none">0</span></button>
@@ -277,6 +277,7 @@ tbody tr:hover td{background:var(--surface2);}
     </div>
     <div style="display:flex;align-items:center;gap:8px">
       <div class="user-chip"><div class="user-av" id="user-av"></div><span id="user-label"></span><span class="role-badge" id="role-badge"></span></div>
+      <button class="btn-sm" id="btn-sync" onclick="syncManual()" title="Sincronizar com Firebase">↻ Sync</button>
       <button class="btn-sm" onclick="alterarSenha()">Senha</button>
       <button class="btn-sm" onclick="logout()">Sair</button>
     </div>
@@ -605,6 +606,14 @@ function saveLocal(){
   localStorage.setItem('crm6_tarefas',JSON.stringify(tarefas));
   localStorage.setItem('crm6_usuarios',JSON.stringify(usuarios));
 }
+async function syncManual(){
+  const btn=document.getElementById('btn-sync');
+  if(btn){ btn.textContent='↻ Sincronizando...'; btn.disabled=true; }
+  await syncRemote();
+  if(btn){ btn.textContent='↻ Sync'; btn.disabled=false; }
+  toast('Dados sincronizados com Firebase!','ok');
+}
+
 // ══════════════════════════════════════════════════════════
 //  FIREBASE SYNC
 // ══════════════════════════════════════════════════════════
@@ -1560,14 +1569,14 @@ function salvarVendedor(){
     usuarios.push({...obj,senha:'123',primeiroacesso:true});
   }
   vendedores=usuarios.filter(u=>u.role!=='gestor');
-  saveLocal(); fecharModal(); renderVendedores(); populaFiltros();
+  saveLocal(); syncRemote(); fecharModal(); renderVendedores(); populaFiltros();
 }
 
 function deletarVendedor(nome){
   confirmar(`Remover ${nome} da equipe?`, ()=>{
     usuarios=usuarios.filter(u=>u.nome!==nome);
     vendedores=usuarios.filter(u=>u.role!=='gestor');
-    saveLocal(); renderVendedores(); toast('Membro removido.','ok');
+    saveLocal(); syncRemote(); renderVendedores(); toast('Membro removido.','ok');
   });
 }
 
