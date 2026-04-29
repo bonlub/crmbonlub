@@ -126,7 +126,7 @@ input::placeholder,select option{text-transform:none;}
 .table-wrap{background:var(--surface);border:0.5px solid var(--border);border-radius:var(--radius-lg);overflow-x:auto;}
 table{width:100%;border-collapse:collapse;font-size:12px;}
 thead th{padding:9px 12px;text-align:left;font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;border-bottom:0.5px solid var(--border);background:var(--surface2);white-space:nowrap;}
-tbody td{padding:8px 12px;border-bottom:0.5px solid var(--border);vertical-align:middle;}
+tbody td{padding:8px 12px;border-bottom:0.5px solid var(--border);vertical-align:middle;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:0;}
 tbody tr:last-child td{border-bottom:none;}
 tbody tr:hover td{background:var(--surface2);}
 .empty-td{text-align:center;color:var(--text3);padding:2.5rem;}
@@ -355,6 +355,11 @@ tbody tr:hover td{background:var(--surface2);}
       </div>
       <div class="table-wrap">
         <table>
+          <colgroup>
+            <col style="width:5%"><col style="width:16%"><col style="width:12%"><col style="width:10%">
+            <col style="width:9%"><col style="width:8%"><col style="width:10%"><col style="width:9%">
+            <col style="width:7%"><col style="width:7%"><col style="width:8%"><col style="width:9%">
+          </colgroup>
           <thead><tr><th>Cód.</th><th>Razão Social</th><th>Nome Fantasia</th><th>CNPJ/CPF</th><th>WhatsApp</th><th>Telefone</th><th>E-mail</th><th>Contato</th><th>Cidade/UF</th><th>Status</th><th>Vendedor</th><th></th></tr></thead>
           <tbody id="tbody-c"></tbody>
         </table>
