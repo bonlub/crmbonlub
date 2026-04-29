@@ -482,14 +482,14 @@ const STATUS_CLIENTE=['CLIENTE ATIVO','CLIENTE INATIVO','LEADS'];
 window.onload=()=>{
   // Limpar dados de versões anteriores que possam conflitar
   const versao=localStorage.getItem('crm6_versao');
-  if(versao!=='11.0'){
+  if(versao!=='12.0'){
     localStorage.removeItem('crm6_usuarios');
     localStorage.removeItem('crm6_session');
     localStorage.removeItem('crm6_deals');
     localStorage.removeItem('crm6_clientes');
     localStorage.removeItem('crm6_vendors');
     localStorage.removeItem('crm6_tarefas');
-    localStorage.setItem('crm6_versao','11.0');
+    localStorage.setItem('crm6_versao','12.0');
   }
   usuarios=JSON.parse(localStorage.getItem('crm6_usuarios')||'[]');
   deals=JSON.parse(localStorage.getItem('crm6_deals')||'[]');
@@ -1593,11 +1593,18 @@ function mostrarMapeamento(){
 function confirmarImport(){
   const mapa=importHeaders.map((_,i)=>document.getElementById(`mp-${i}`).value);
   let n=0, skip=0;
+  const statusValidos=['CLIENTE ATIVO','CLIENTE INATIVO','LEADS'];
   importData.forEach(row=>{
     const obj={status:'LEADS',global:true,vendedor:'',dataVinculo:'',cadastradoPor:'importação',codCliente:'',reativacoes:0};
     mapa.forEach((campo,i)=>{ const val=String(row[i]||'').trim().toUpperCase(); const key=CMAP[campo]; if(key) obj[key]=val; });
     if(!obj.razaoSocial){ skip++; return; }
-    // Validações
+    // Gestor: respeita status da planilha se válido; outros: sempre LEADS
+    if(CFG.role==='gestor'){
+      if(!statusValidos.includes(obj.status)) obj.status='LEADS';
+    } else {
+      obj.status='LEADS';
+    }
+    // Validações de duplicata
     if(obj.cnpj&&obj.cnpj.replace(/\D/g,'').length>11&&clientes.find(c=>c.cnpj&&normalize(c.cnpj)===normalize(obj.cnpj))){ skip++; return; }
     if(clientes.find(c=>normalize(c.razaoSocial)===normalize(obj.razaoSocial))){ skip++; return; }
     if(obj.nomeFantasia&&clientes.find(c=>c.nomeFantasia&&normalize(c.nomeFantasia)===normalize(obj.nomeFantasia))){ skip++; return; }
