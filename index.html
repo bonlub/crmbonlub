@@ -7,6 +7,25 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>CRM</title>
+<script>
+// Força recarregar sempre a versão mais recente do GitHub
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.getRegistrations().then(regs=>regs.forEach(r=>r.unregister()));
+}
+// Adiciona timestamp na URL para quebrar cache se vier de link antigo
+(function(){
+  const url=new URL(window.location.href);
+  const stored=localStorage.getItem('crm_build');
+  const build='13';
+  if(stored!==build){
+    localStorage.setItem('crm_build',build);
+    if(!url.searchParams.get('v')){
+      url.searchParams.set('v',build);
+      window.location.replace(url.toString());
+    }
+  }
+})();
+</script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap');
