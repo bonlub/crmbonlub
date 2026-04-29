@@ -639,8 +639,12 @@ function saveLocal(){
 async function syncRemote(){
   if(!CFG.url) return;
   try{
-    const payload=encodeURIComponent(JSON.stringify({deals,clientes,usuarios,tarefas}));
-    await fetch(`${CFG.url}?action=sync&data=${payload}`,{method:'GET',mode:'no-cors'});
+    const data=JSON.stringify({deals,clientes,usuarios,tarefas});
+    // Usa XMLHttpRequest que tem menos restrições que fetch para Apps Script
+    const xhr=new XMLHttpRequest();
+    xhr.open('POST',CFG.url+'?action=sync',true);
+    xhr.setRequestHeader('Content-Type','text/plain;charset=UTF-8');
+    xhr.send(data);
   }catch(e){}
 }
 
