@@ -256,7 +256,7 @@ tbody tr:hover td{background:var(--surface2);}
     <div class="login-logo">CRM</div>
     <div class="login-sub">Acesse sua conta</div>
     <label>URL Google Apps Script (opcional)</label>
-    <input id="lg-url" value="https://script.google.com/macros/s/AKfycbxLy60fDEcPmrHuscDhqh8-F-ugF7pjM6gA8_rACBKbnsdojXJkv9SX2DZZ3luV8DJo/exec" style="text-transform:none">
+    <input id="lg-url" value="https://script.google.com/macros/s/AKfycbyEmSWWw7EKRt1l-wqZrd70xzKhdlrqrropqLy1RgoW7TlpZ9CLcLbg6Fyyc-Q_KIyb/exec" style="text-transform:none">
     <label>Usuário</label>
     <input id="lg-user" placeholder="Seu nome" style="text-transform:none" oninput="this.value=this.value.replace(/[^a-zA-Z\s]/g,'')">
     <label>Senha</label>
@@ -519,7 +519,7 @@ window.onload=()=>{
   tarefas=JSON.parse(localStorage.getItem('crm6_tarefas')||'[]');
   if(!usuarios.length) seedUsuarios();
   // Tentar sincronizar usuários do Sheets para preservar senhas
-  const URL_FIXED='https://script.google.com/macros/s/AKfycbxLy60fDEcPmrHuscDhqh8-F-ugF7pjM6gA8_rACBKbnsdojXJkv9SX2DZZ3luV8DJo/exec';
+  const URL_FIXED='https://script.google.com/macros/s/AKfycbyEmSWWw7EKRt1l-wqZrd70xzKhdlrqrropqLy1RgoW7TlpZ9CLcLbg6Fyyc-Q_KIyb/exec';
   fetch(URL_FIXED+'?action=getAll').then(r=>r.json()).then(d=>{
     if(d.ok&&d.usuarios&&d.usuarios.length){
       // Mescla: mantém dados locais mas atualiza senhas vindas do Sheets
@@ -636,15 +636,30 @@ function saveLocal(){
   localStorage.setItem('crm6_tarefas',JSON.stringify(tarefas));
   localStorage.setItem('crm6_usuarios',JSON.stringify(usuarios));
 }
-async function syncRemote(){
+function syncRemote(){
   if(!CFG.url) return;
   try{
-    const data=JSON.stringify({deals,clientes,usuarios,tarefas});
-    // Usa XMLHttpRequest que tem menos restrições que fetch para Apps Script
-    const xhr=new XMLHttpRequest();
-    xhr.open('POST',CFG.url+'?action=sync',true);
-    xhr.setRequestHeader('Content-Type','text/plain;charset=UTF-8');
-    xhr.send(data);
+    // Iframe oculto é a única forma garantida de contornar CORS com Apps Script
+    const existente=document.getElementById('sync-frame');
+    if(existente) existente.remove();
+    const form=document.createElement('form');
+    form.method='POST';
+    form.action=CFG.url+'?action=sync';
+    form.target='sync-frame';
+    form.style.display='none';
+    const input=document.createElement('input');
+    input.type='hidden';
+    input.name='data';
+    input.value=JSON.stringify({deals,clientes,usuarios,tarefas});
+    form.appendChild(input);
+    const iframe=document.createElement('iframe');
+    iframe.name='sync-frame';
+    iframe.id='sync-frame';
+    iframe.style.display='none';
+    document.body.appendChild(iframe);
+    document.body.appendChild(form);
+    form.submit();
+    setTimeout(()=>{ form.remove(); },3000);
   }catch(e){}
 }
 
