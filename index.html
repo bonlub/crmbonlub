@@ -519,7 +519,7 @@ window.onload=()=>{
   tarefas=JSON.parse(localStorage.getItem('crm6_tarefas')||'[]');
   if(!usuarios.length) seedUsuarios();
   // Tentar sincronizar usuários do Sheets para preservar senhas
-  const URL_FIXED='https://script.google.com/macros/s/AKfycbwSqWmWVktuUkXPQ_SwIMM_Va3oW90RXX46ArupNo3eGVuGKLEL_KbaIFXj0ZTWSw68/exec';
+  const URL_FIXED='https://script.google.com/macros/s/AKfycbxLy60fDEcPmrHuscDhqh8-F-ugF7pjM6gA8_rACBKbnsdojXJkv9SX2DZZ3luV8DJo/exec';
   fetch(URL_FIXED+'?action=getAll').then(r=>r.json()).then(d=>{
     if(d.ok&&d.usuarios&&d.usuarios.length){
       // Mescla: mantém dados locais mas atualiza senhas vindas do Sheets
