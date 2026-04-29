@@ -234,7 +234,7 @@ tbody tr:hover td{background:var(--surface2);}
     <div class="login-logo">CRM</div>
     <div class="login-sub">Acesse sua conta</div>
     <label>URL Google Apps Script (opcional)</label>
-    <input id="lg-url" placeholder="https://script.google.com/..." style="text-transform:none">
+    <input id="lg-url" value="https://script.google.com/macros/s/AKfycbzJNvAXpuKkwDt-WKufAxx23vPha3CFsJCE0yxBGoUISx-J9ER_Cn6FIjhzzyMPeEL7/exec" style="text-transform:none">
     <label>Usuário</label>
     <input id="lg-user" placeholder="Seu nome" style="text-transform:none" oninput="this.value=this.value.replace(/[^a-zA-Z\s]/g,'')">
     <label>Senha</label>
@@ -579,14 +579,32 @@ function iniciarApp(){
   }
   checar90dias(); checarClientesInativos();
   carregarConfig();
-  // Preencher datas padrão com mês corrente
   const ini=mesCorrienteInicio(), fim=mesCorrienteFim();
   ['kb-de','kb-ate','t-de','t-ate','dash-de','dash-ate','c-de','c-ate'].forEach(id=>{
     const el=document.getElementById(id); if(el){ el.value=id.endsWith('-de')||id==='dash-de'?ini:fim; }
   });
-  // Tarefas padrão em andamento
   const ts=document.getElementById('t-status'); if(ts) ts.value='andamento';
-  renderAll(); atualizarBadgeTarefas();
+  // Tentar carregar dados do Sheets se URL configurada
+  if(CFG.url){
+    carregarDoSheets().then(()=>{ renderAll(); atualizarBadgeTarefas(); });
+  } else {
+    renderAll(); atualizarBadgeTarefas();
+  }
+}
+
+async function carregarDoSheets(){
+  try{
+    const r=await fetch(CFG.url+'?action=getAll');
+    const d=await r.json();
+    if(d.ok){
+      if(d.clientes&&d.clientes.length) clientes=d.clientes;
+      if(d.deals&&d.deals.length) deals=d.deals;
+      if(d.tarefas&&d.tarefas.length) tarefas=d.tarefas;
+      if(d.usuarios&&d.usuarios.length){ usuarios=d.usuarios; vendedores=usuarios.filter(u=>u.role!=='gestor'); }
+      saveLocal();
+      toast('Dados sincronizados com Google Sheets.','ok');
+    }
+  }catch(e){ toast('Usando dados locais (Sheets indisponível).','warn'); }
 }
 
 // ══════════════════════════════════════════════════════════
@@ -1613,11 +1631,10 @@ function confirmarImport(modo='novo'){
       if(!existing) existing=clientes.find(c=>normalize(c.razaoSocial)===normalize(obj.razaoSocial));
 
       if(existing){
-        // Preenche apenas campos que estão vazios no cadastro atual
+        // Sobrescreve todos os campos de contato com os valores da planilha (se preenchidos)
         const campos=['tel','tel2','tel3','email','email2','whatsapp','contato','cidade','estado','nomeFantasia','obs'];
-        campos.forEach(k=>{ if(!existing[k]&&obj[k]) existing[k]=obj[k]; });
-        // Cod cliente: atualiza se estava vazio
-        if(!existing.codCliente&&obj.codCliente) existing.codCliente=obj.codCliente;
+        campos.forEach(k=>{ if(obj[k]) existing[k]=obj[k]; });
+        if(obj.codCliente) existing.codCliente=obj.codCliente;
         atualizados++;
       } else {
         skip++; // não encontrou para atualizar
