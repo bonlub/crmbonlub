@@ -623,14 +623,18 @@ async function syncRemote(){
 
 async function carregarDoFirebase(){
   try{
+    // Desabilitar cache do Firestore para sempre buscar dados frescos
+    db.settings({ cacheSizeBytes: firebase.firestore.CACHE_SIZE_UNLIMITED });
     const ref=db.collection('crm').doc('dados');
-    const doc=await ref.get();
+    // force server fetch ignorando cache local
+    const doc=await ref.get({ source: 'server' });
     if(doc.exists){
       const d=doc.data();
-      if(d.clientes){ const c=JSON.parse(d.clientes); if(c.length) clientes=c; }
-      if(d.deals){ const dl=JSON.parse(d.deals); if(dl.length) deals=dl; }
-      if(d.tarefas){ const t=JSON.parse(d.tarefas); if(t.length) tarefas=t; }
-      if(d.usuarios){ const u=JSON.parse(d.usuarios); if(u.length){ usuarios=u; vendedores=usuarios.filter(u=>u.role!=='gestor'); }}
+      // Firebase é sempre a fonte de verdade — sobrescreve tudo
+      if(d.clientes){ clientes=JSON.parse(d.clientes); }
+      if(d.deals){ deals=JSON.parse(d.deals); }
+      if(d.tarefas){ tarefas=JSON.parse(d.tarefas); }
+      if(d.usuarios){ usuarios=JSON.parse(d.usuarios); vendedores=usuarios.filter(u=>u.role!=='gestor'); }
       saveLocal();
       return true;
     }
@@ -1806,6 +1810,7 @@ function carregarFirebase(){
     localStorage.removeItem('crm6_session');
     localStorage.setItem('crm6_versao','13.1');
   }
+  // Carregar localStorage como fallback inicial
   usuarios=JSON.parse(localStorage.getItem('crm6_usuarios')||'[]');
   deals=JSON.parse(localStorage.getItem('crm6_deals')||'[]');
   clientes=JSON.parse(localStorage.getItem('crm6_clientes')||'[]');
