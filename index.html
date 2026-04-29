@@ -500,20 +500,7 @@ const STATUS_CLIENTE=['CLIENTE ATIVO','CLIENTE INATIVO','LEADS'];
 // ══════════════════════════════════════════════════════════
 //  LOGIN / SENHA
 // ══════════════════════════════════════════════════════════
-window.onload=()=>{
-  const versao=localStorage.getItem('crm6_versao');
-  if(versao!=='13.1'){
-    localStorage.removeItem('crm6_session');
-    localStorage.setItem('crm6_versao','13.1');
-  }
-  usuarios=JSON.parse(localStorage.getItem('crm6_usuarios')||'[]');
-  deals=JSON.parse(localStorage.getItem('crm6_deals')||'[]');
-  clientes=JSON.parse(localStorage.getItem('crm6_clientes')||'[]');
-  vendedores=JSON.parse(localStorage.getItem('crm6_vendors')||'[]');
-  tarefas=JSON.parse(localStorage.getItem('crm6_tarefas')||'[]');
-  if(!usuarios.length) seedUsuarios();
-  // iniciarApp() é chamado pelo script do Firebase no final do body
-};
+window.onload=()=>{}; // inicialização feita pelo script Firebase no final do body
 
 function seedUsuarios(){
   usuarios=[
@@ -1785,23 +1772,50 @@ function uid(){ return Math.random().toString(36).slice(2,9)+Date.now().toString
 function initials(nome){ return (nome||'').split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase(); }
 function normalize(s){ return (s||'').toUpperCase().replace(/[^A-Z0-9]/g,''); }
 </script>
-<!-- Firebase SDK - carrega por último para garantir disponibilidade -->
-<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+<!-- Firebase carregado dinamicamente -->
 <script>
-const firebaseConfig={
-  apiKey:"AIzaSyCrlZS_33Pr8nAdsOEXY2LHAaSfkgYRDwM",
-  authDomain:"crmbonlub.firebaseapp.com",
-  projectId:"crmbonlub",
-  storageBucket:"crmbonlub.firebasestorage.app",
-  messagingSenderId:"908874938013",
-  appId:"1:908874938013:web:b75c57d24bd5529477c674"
-};
-firebase.initializeApp(firebaseConfig);
-window.db=firebase.firestore();
-// Iniciar app após Firebase estar pronto
-const _sess=localStorage.getItem('crm6_session');
-if(_sess){ CFG=JSON.parse(_sess); iniciarApp(); }
+function carregarFirebase(){
+  return new Promise((resolve)=>{
+    const s1=document.createElement('script');
+    s1.src='https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js';
+    s1.onload=()=>{
+      const s2=document.createElement('script');
+      s2.src='https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js';
+      s2.onload=()=>{
+        firebase.initializeApp({
+          apiKey:"AIzaSyCrlZS_33Pr8nAdsOEXY2LHAaSfkgYRDwM",
+          authDomain:"crmbonlub.firebaseapp.com",
+          projectId:"crmbonlub",
+          storageBucket:"crmbonlub.firebasestorage.app",
+          messagingSenderId:"908874938013",
+          appId:"1:908874938013:web:b75c57d24bd5529477c674"
+        });
+        window.db=firebase.firestore();
+        resolve();
+      };
+      document.head.appendChild(s2);
+    };
+    document.head.appendChild(s1);
+  });
+}
+
+// Carregar dados locais primeiro, depois Firebase, depois iniciar app
+(async function(){
+  const versao=localStorage.getItem('crm6_versao');
+  if(versao!=='13.1'){
+    localStorage.removeItem('crm6_session');
+    localStorage.setItem('crm6_versao','13.1');
+  }
+  usuarios=JSON.parse(localStorage.getItem('crm6_usuarios')||'[]');
+  deals=JSON.parse(localStorage.getItem('crm6_deals')||'[]');
+  clientes=JSON.parse(localStorage.getItem('crm6_clientes')||'[]');
+  vendedores=JSON.parse(localStorage.getItem('crm6_vendors')||'[]');
+  tarefas=JSON.parse(localStorage.getItem('crm6_tarefas')||'[]');
+  if(!usuarios.length) seedUsuarios();
+  await carregarFirebase();
+  const sess=localStorage.getItem('crm6_session');
+  if(sess){ CFG=JSON.parse(sess); iniciarApp(); }
+})();
 </script>
 </body>
 </html>
