@@ -483,7 +483,6 @@ const STATUS_CLIENTE=['CLIENTE ATIVO','CLIENTE INATIVO','LEADS'];
 //  LOGIN / SENHA
 // ══════════════════════════════════════════════════════════
 window.onload=()=>{
-  // Limpar dados de versões anteriores que possam conflitar
   const versao=localStorage.getItem('crm6_versao');
   if(versao!=='13.1'){
     localStorage.removeItem('crm6_session');
@@ -495,6 +494,20 @@ window.onload=()=>{
   vendedores=JSON.parse(localStorage.getItem('crm6_vendors')||'[]');
   tarefas=JSON.parse(localStorage.getItem('crm6_tarefas')||'[]');
   if(!usuarios.length) seedUsuarios();
+  // Tentar sincronizar usuários do Sheets para preservar senhas
+  const URL_FIXED='https://script.google.com/macros/s/AKfycbzJNvAXpuKkwDt-WKufAxx23vPha3CFsJCE0yxBGoUISx-J9ER_Cn6FIjhzzyMPeEL7/exec';
+  fetch(URL_FIXED+'?action=getAll').then(r=>r.json()).then(d=>{
+    if(d.ok&&d.usuarios&&d.usuarios.length){
+      // Mescla: mantém dados locais mas atualiza senhas vindas do Sheets
+      d.usuarios.forEach(u=>{
+        const local=usuarios.find(x=>x.nome===u.nome);
+        if(local){ local.senha=u.senha; local.primeiroacesso=u.primeiroacesso; }
+        else usuarios.push(u);
+      });
+      vendedores=usuarios.filter(u=>u.role!=='gestor');
+      saveLocal();
+    }
+  }).catch(()=>{});
   const sess=localStorage.getItem('crm6_session');
   if(sess){ CFG=JSON.parse(sess); iniciarApp(); }
 };
@@ -537,7 +550,7 @@ function confirmarNovaSenha(nome){
   if(s1!==s2){toast('Senhas não conferem.','err');return;}
   const u=usuarios.find(x=>x.nome===nome);
   u.senha=s1; u.primeiroacesso=false;
-  saveLocal(); fecharModal(); iniciarApp();
+  saveLocal(); syncRemote(); fecharModal(); iniciarApp();
 }
 
 function alterarSenha(){
@@ -557,7 +570,7 @@ function confirmarAlterarSenha(){
   const n=document.getElementById('sa-nova').value;
   if(n.length<4){toast('Mínimo 4 caracteres.','err');return;}
   if(n!==document.getElementById('sa-conf').value){toast('Senhas não conferem.','err');return;}
-  u.senha=n; saveLocal(); fecharModal(); toast('Senha alterada com sucesso!','ok');
+  u.senha=n; saveLocal(); syncRemote(); fecharModal(); toast('Senha alterada com sucesso!','ok');
 }
 
 function logout(){ localStorage.removeItem('crm6_session'); location.reload(); }
