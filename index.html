@@ -855,7 +855,27 @@ function _finalizarGanho(d){
 
 function vincularVendedor(d){
   const c=clientes.find(x=>x.id===d.clienteId); if(!c) return;
-  c.vendedor=d.vendedor||CFG.nome; c.dataVinculo=hoje(); saveLocal();
+  const novoVendedor=d.vendedor||CFG.nome;
+  const vendedorAnterior=c.vendedor;
+  c.vendedor=novoVendedor; c.dataVinculo=hoje();
+
+  // Se trocou de vendedor, remove deals e tarefas dos outros vendedores para este cliente
+  if(vendedorAnterior && vendedorAnterior!==novoVendedor){
+    // Remove deals de outros vendedores que não sejam ganho (finalizados ficam no histórico)
+    deals=deals.filter(dl=>{
+      if(dl.clienteId!==c.id) return true;
+      if(dl.etapa==='ganho'||dl.etapa==='perdido') return true; // mantém finalizados
+      if(dl.vendedor===novoVendedor) return true; // mantém do novo vendedor
+      return false; // remove dos outros
+    });
+    // Remove tarefas de outros vendedores para este cliente
+    tarefas=tarefas.filter(t=>{
+      if(t.clienteId!==c.id) return true;
+      if(t.vendedor===novoVendedor) return true;
+      return false;
+    });
+  }
+  saveLocal();
 }
 
 function abrirAgendamentoPosFinal(clienteId){
