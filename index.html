@@ -650,21 +650,21 @@ async function carregarDoFirebase(){
 
 function limparDadosDeOutrosVendedores(){
   if(!CFG.nome||CFG.role==='gestor'||CFG.role==='gerente') return;
-  // Remove deals em andamento de clientes vinculados a outro vendedor
+  // Remove deals em andamento cujo cliente está vinculado a outro vendedor
   deals=deals.filter(d=>{
-    if(d.etapa==='ganho'||d.etapa==='perdido') return true;
-    if(d.vendedor===CFG.nome) return true;
+    if(d.etapa==='ganho'||d.etapa==='perdido') return true; // finalizados sempre ficam
     const c=clientes.find(x=>x.id===d.clienteId);
     if(!c) return true;
-    if(c.vendedor&&c.vendedor!==CFG.nome) return false;
+    // Se cliente tem vendedor e não é o usuário atual, remove o deal
+    if(c.vendedor && c.vendedor!==CFG.nome) return false;
     return true;
   });
-  // Remove tarefas de clientes vinculados a outro vendedor
+  // Remove tarefas cujo cliente está vinculado a outro vendedor
   tarefas=tarefas.filter(t=>{
-    if(t.vendedor!==CFG.nome) return true;
+    if(t.vendedor!==CFG.nome) return true; // tarefa de outro, não mexe
     const c=clientes.find(x=>x.id===t.clienteId);
     if(!c) return true;
-    if(c.vendedor&&c.vendedor!==CFG.nome) return false;
+    if(c.vendedor && c.vendedor!==CFG.nome) return false;
     return true;
   });
 }
