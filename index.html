@@ -584,27 +584,7 @@ function iniciarApp(){
     const el=document.getElementById(id); if(el){ el.value=id.endsWith('-de')||id==='dash-de'?ini:fim; }
   });
   const ts=document.getElementById('t-status'); if(ts) ts.value='andamento';
-  // Tentar carregar dados do Sheets se URL configurada
-  if(CFG.url){
-    carregarDoSheets().then(()=>{ renderAll(); atualizarBadgeTarefas(); });
-  } else {
-    renderAll(); atualizarBadgeTarefas();
-  }
-}
-
-async function carregarDoSheets(){
-  try{
-    const r=await fetch(CFG.url+'?action=getAll');
-    const d=await r.json();
-    if(d.ok){
-      if(d.clientes&&d.clientes.length) clientes=d.clientes;
-      if(d.deals&&d.deals.length) deals=d.deals;
-      if(d.tarefas&&d.tarefas.length) tarefas=d.tarefas;
-      if(d.usuarios&&d.usuarios.length){ usuarios=d.usuarios; vendedores=usuarios.filter(u=>u.role!=='gestor'); }
-      saveLocal();
-      toast('Dados sincronizados com Google Sheets.','ok');
-    }
-  }catch(e){ toast('Usando dados locais (Sheets indisponível).','warn'); }
+  renderAll(); atualizarBadgeTarefas();
 }
 
 // ══════════════════════════════════════════════════════════
