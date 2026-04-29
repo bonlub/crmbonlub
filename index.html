@@ -1571,9 +1571,9 @@ function handleFile(file){
   r.onload=e=>{ const wb=XLSX.read(e.target.result,{type:'binary'}); const ws=wb.Sheets[wb.SheetNames[0]]; const rows=XLSX.utils.sheet_to_json(ws,{header:1}); importHeaders=rows[0]||[]; importData=rows.slice(1).filter(r=>r.some(c=>c)); mostrarMapeamento(); };
   r.readAsBinaryString(file);
 }
-const CMAP={'Razão Social':'razaoSocial','Nome Fantasia':'nomeFantasia','CNPJ/CPF':'cnpj','WhatsApp':'whatsapp','Telefone':'tel','Telefone 2':'tel2','Telefone 3':'tel3','E-mail':'email','E-mail 2':'email2','Contato':'contato','Cidade':'cidade','Estado':'estado','Status':'status','Observações':'obs'};
+const CMAP={'Cod. Cliente':'codCliente','Razão Social':'razaoSocial','Nome Fantasia':'nomeFantasia','CNPJ/CPF':'cnpj','WhatsApp':'whatsapp','Telefone':'tel','Telefone 2':'tel2','Telefone 3':'tel3','E-mail':'email','E-mail 2':'email2','Contato':'contato','Cidade':'cidade','Estado':'estado','Status':'status','Observações':'obs'};
 const CAMPOS_IMP=['(ignorar)',...Object.keys(CMAP)];
-function autoMapI(h){ h=h.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,''); if(/razao|rs/.test(h)) return 'Razão Social'; if(/fantasia|nf/.test(h)) return 'Nome Fantasia'; if(/cnpj|cpf/.test(h)) return 'CNPJ/CPF'; if(/whats|zap/.test(h)) return 'WhatsApp'; if(/tel3|fone3/.test(h)) return 'Telefone 3'; if(/tel2|fone2/.test(h)) return 'Telefone 2'; if(/tel|fone|celular/.test(h)) return 'Telefone'; if(/email2|mail2/.test(h)) return 'E-mail 2'; if(/email|mail/.test(h)) return 'E-mail'; if(/contato|responsavel/.test(h)) return 'Contato'; if(/cidade/.test(h)) return 'Cidade'; if(/estado|uf/.test(h)) return 'Estado'; if(/status/.test(h)) return 'Status'; if(/obs|nota/.test(h)) return 'Observações'; return '(ignorar)'; }
+function autoMapI(h){ h=h.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,''); if(/cod|codigo|client/.test(h)) return 'Cod. Cliente'; if(/razao|rs/.test(h)) return 'Razão Social'; if(/fantasia|nf/.test(h)) return 'Nome Fantasia'; if(/cnpj|cpf/.test(h)) return 'CNPJ/CPF'; if(/whats|zap/.test(h)) return 'WhatsApp'; if(/tel3|fone3/.test(h)) return 'Telefone 3'; if(/tel2|fone2/.test(h)) return 'Telefone 2'; if(/tel|fone|celular/.test(h)) return 'Telefone'; if(/email2|mail2/.test(h)) return 'E-mail 2'; if(/email|mail/.test(h)) return 'E-mail'; if(/contato|responsavel/.test(h)) return 'Contato'; if(/cidade/.test(h)) return 'Cidade'; if(/estado|uf/.test(h)) return 'Estado'; if(/status/.test(h)) return 'Status'; if(/obs|nota/.test(h)) return 'Observações'; return '(ignorar)'; }
 
 function mostrarMapeamento(){
   document.getElementById('import-body').innerHTML=`<h4 style="font-size:13px;font-weight:600;margin:1.25rem 0 .5rem">Mapear colunas</h4>
@@ -1605,6 +1605,7 @@ function confirmarImport(){
       obj.status='LEADS';
     }
     // Validações de duplicata
+    if(obj.codCliente&&clientes.find(c=>c.codCliente&&normalize(c.codCliente)===normalize(obj.codCliente))){ skip++; return; }
     if(obj.cnpj&&obj.cnpj.replace(/\D/g,'').length>11&&clientes.find(c=>c.cnpj&&normalize(c.cnpj)===normalize(obj.cnpj))){ skip++; return; }
     if(clientes.find(c=>normalize(c.razaoSocial)===normalize(obj.razaoSocial))){ skip++; return; }
     if(obj.nomeFantasia&&clientes.find(c=>c.nomeFantasia&&normalize(c.nomeFantasia)===normalize(obj.nomeFantasia))){ skip++; return; }
