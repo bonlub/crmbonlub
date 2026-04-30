@@ -298,6 +298,7 @@ tbody tr:hover td{background:var(--surface2);}
     </div>
     <div style="display:flex;align-items:center;gap:8px">
       <div class="user-chip"><div class="user-av" id="user-av"></div><span id="user-label"></span><span class="role-badge" id="role-badge"></span></div>
+      <button class="btn-sm" id="btn-backup" style="display:none;background:var(--g-bg);color:var(--g-text);border-color:var(--g-border)" onclick="fazerBackup()" title="Exportar backup completo">⬇ Backup</button>
       <button class="btn-sm" id="btn-sync" onclick="syncManual()" title="Sincronizar com Firebase">↻ Sync</button>
       <button class="btn-sm" onclick="alterarSenha()">Senha</button>
       <button class="btn-sm" onclick="logout()">Sair</button>
@@ -516,9 +517,6 @@ tbody tr:hover td{background:var(--surface2);}
             <button class="btn-outline" onclick="adicionarCategoria()">Adicionar</button>
           </div>
         </div>
-          <p style="font-size:12px;color:var(--text2);margin-bottom:1rem;line-height:1.6">Remove todos os clientes, negócios e tarefas de exemplo. Use apenas ao iniciar o sistema pela primeira vez.</p>
-          <button class="btn-outline" style="color:#881337;border-color:#FECDD3;width:100%" onclick="resetarDadosDemo()">Limpar dados de demonstração</button>
-        </div>
 
       </div>
     </div>
@@ -656,6 +654,7 @@ function iniciarApp(){
     document.getElementById('btn-nav-importar').style.display='';
     document.getElementById('btn-nav-config').style.display='';
     document.getElementById('btn-nav-log').style.display='';
+    document.getElementById('btn-backup').style.display='';
     document.getElementById('f-novos').style.display='';
     document.getElementById('btn-exportar-c').style.display='';
     document.getElementById('btn-nav-relatorio').style.display='';
@@ -713,6 +712,48 @@ function saveLocal(){
   localStorage.setItem('crm6_usuarios',JSON.stringify(usuarios));
   localStorage.setItem('crm6_log',JSON.stringify(log_.slice(-500))); // máximo 500 entradas
 }
+function fazerBackup(){
+  const wb=XLSX.utils.book_new();
+  const dt=new Date().toLocaleDateString('pt-BR').replace(/\//g,'-');
+
+  // Aba Clientes
+  const dadosClientes=clientes.map(c=>({
+    'Cód.Cliente':c.codCliente,'Razão Social':c.razaoSocial,'Nome Fantasia':c.nomeFantasia,
+    'CNPJ/CPF':c.cnpj,'IE':c.ie,'WhatsApp':c.whatsapp,'Tel':c.tel,'Tel2':c.tel2,'Tel3':c.tel3,
+    'E-mail':c.email,'E-mail2':c.email2,'Contato':c.contato,'Cidade':c.cidade,'Estado':c.estado,
+    'Transportadora':c.transportadora,'Categoria':c.categoria,'Status':c.status,
+    'Vendedor':c.vendedor,'Data Vínculo':c.dataVinculo,'Valor Potencial':c.valorPotencial||0,
+    'Reativações':c.reativacoes||0,'Cadastrado Por':c.cadastradoPor,'Observações':c.obs
+  }));
+  const wsC=XLSX.utils.json_to_sheet(dadosClientes.length?dadosClientes:[{info:'Sem dados'}]);
+  XLSX.utils.book_append_sheet(wb,wsC,'Clientes');
+
+  // Aba Negócios
+  const dadosDeals=deals.map(d=>({
+    'ID':d.id,'Cliente':nomeCliente(d.clienteId),'Valor':d.valor,'Etapa':ELABEL[d.etapa]||d.etapa,
+    'Vendedor':d.vendedor,'Data':d.data,'Nº Orçamento':d.numOrcamento||'','Motivo Perda':d.motivo||'','Obs':d.obs
+  }));
+  const wsD=XLSX.utils.json_to_sheet(dadosDeals.length?dadosDeals:[{info:'Sem dados'}]);
+  XLSX.utils.book_append_sheet(wb,wsD,'Negócios');
+
+  // Aba Tarefas
+  const dadosTarefas=tarefas.map(t=>({
+    'Cliente':nomeCliente(t.clienteId),'Vendedor':t.vendedor,'Data':t.data,
+    'Status':t.status,'Observação':t.obs,'Criado Por':t.criadoPor,'Criado Em':t.criadoEm
+  }));
+  const wsT=XLSX.utils.json_to_sheet(dadosTarefas.length?dadosTarefas:[{info:'Sem dados'}]);
+  XLSX.utils.book_append_sheet(wb,wsT,'Tarefas');
+
+  // Aba Usuários (sem senhas)
+  const dadosUsuarios=usuarios.map(u=>({'Nome':u.nome,'Perfil':u.role,'Cargo':u.cargo||'','E-mail':u.email||'','Meta':u.meta||0}));
+  const wsU=XLSX.utils.json_to_sheet(dadosUsuarios.length?dadosUsuarios:[{info:'Sem dados'}]);
+  XLSX.utils.book_append_sheet(wb,wsU,'Usuários');
+
+  XLSX.writeFile(wb,`backup_crm_${dt}.xlsx`);
+  toast('Backup exportado com sucesso!','ok');
+  registrarLog('login','Backup realizado',`${clientes.length} clientes, ${deals.length} negócios, ${tarefas.length} tarefas`);
+}
+
 async function syncManual(){
   const btn=document.getElementById('btn-sync');
   if(btn){ btn.textContent='↻ Sincronizando...'; btn.disabled=true; }
