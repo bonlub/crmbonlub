@@ -249,7 +249,7 @@ tbody tr:hover td{background:var(--surface2);}
 <!-- LOGIN -->
 <div id="login-screen">
   <div class="login-card">
-    <div class="login-logo">CRM <span style="font-size:12px;font-weight:400;color:var(--text3)">v14.7</span></div>
+    <div class="login-logo">CRM <span style="font-size:12px;font-weight:400;color:var(--text3)">v14.9.3</span></div>
     <div class="login-sub">Acesse sua conta</div>
     <label>Usuário</label>
     <input id="lg-user" placeholder="Seu nome" style="text-transform:none" oninput="this.value=this.value.replace(/[^a-zA-Z\s]/g,'')">
@@ -264,7 +264,7 @@ tbody tr:hover td{background:var(--surface2);}
 <div id="app">
   <div class="topbar">
     <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-      <span class="topbar-logo">CRM <span style="font-size:10px;font-weight:400;color:var(--text3)">v14.7</span></span>
+      <span class="topbar-logo">CRM <span style="font-size:10px;font-weight:400;color:var(--text3)">v14.9.3</span></span>
       <nav class="nav">
         <button class="nav-btn active" onclick="nav('funil',this)">Funil</button>
         <button class="nav-btn" onclick="nav('tarefas',this)" id="btn-nav-tarefas">Tarefas<span class="nav-badge" id="badge-tarefas" style="display:none">0</span></button>
@@ -796,6 +796,7 @@ function dealCard(d){
       ${!finalizado?`<button class="deal-btn task" onclick="event.stopPropagation();abrirTarefa(null,'${d.clienteId}')">+ Tarefa</button>`:''}
       ${finalizado?`<span style="font-size:10px;color:var(--text3)">Finalizado</span>`:''}
       <button class="deal-btn" onclick="event.stopPropagation();abrirDeal('${d.id}')">Ver</button>
+      ${d.clienteId?`<button class="deal-btn" style="color:#5B21B6;border-color:#DDD6FE;background:#F5F3FF" onclick="event.stopPropagation();verDadosCliente('${d.clienteId}')">👁 Cliente</button>`:''}
       ${CFG.role==='gestor'?`<button class="deal-btn red" onclick="event.stopPropagation();deletarDeal('${d.id}')">Remover</button>`:''}
     </div>`:''}
   </div>`;
@@ -951,6 +952,7 @@ function abrirDeal(id=null, preClienteId=null){
             value="${esc(cAtual?cAtual.razaoSocial:'')}" oninput="acBuscar(this.value)" onfocus="acBuscar(this.value)">
           <div class="ac-list" id="ac-list" style="display:none"></div>
           <input type="hidden" id="fd-clienteId" value="${clienteIdInicial}">
+          ${clienteIdInicial?`<button type="button" class="btn-sm" style="margin-top:6px;color:#5B21B6;border-color:#DDD6FE;background:#F5F3FF;font-size:11px" onclick="verDadosCliente(document.getElementById('fd-clienteId').value)">👁 Ver dados do cliente</button>`:''}
         </div>
       </div>
       <div class="frow"><label>Valor (R$)</label><input id="fd-valor" type="number" min="0" step="0.01" value="${d.valor||''}"></div>
@@ -1044,7 +1046,26 @@ function acBuscar(q){
   </div>`).join('');
   list.style.display='block';
 }
-function acSelecionar(id,nome){ document.getElementById('ac-q').value=nome; document.getElementById('fd-clienteId').value=id; document.getElementById('ac-list').style.display='none'; }
+function acSelecionar(id,nome){
+  document.getElementById('ac-q').value=nome;
+  document.getElementById('fd-clienteId').value=id;
+  document.getElementById('ac-list').style.display='none';
+  // Adicionar ou mostrar botão de dados do cliente
+  const wrap=document.getElementById('ac-q')?.closest('.ac-wrap');
+  if(wrap){
+    let btn=wrap.querySelector('.btn-dados-cli');
+    if(!btn){
+      btn=document.createElement('button');
+      btn.type='button';
+      btn.className='btn-sm btn-dados-cli';
+      btn.style.cssText='margin-top:6px;color:#5B21B6;border-color:#DDD6FE;background:#F5F3FF;font-size:11px';
+      btn.textContent='👁 Ver dados do cliente';
+      btn.onclick=()=>verDadosCliente(document.getElementById('fd-clienteId').value);
+      wrap.appendChild(btn);
+    }
+    btn.style.display='';
+  }
+}
 
 // ══════════════════════════════════════════════════════════
 //  TAREFAS
@@ -1095,6 +1116,7 @@ function renderTarefas(){
 
 function tarefaCard(t){
   const cn=nomeCliente(t.clienteId);
+  const c=clientes.find(x=>x.id===t.clienteId);
   const vencida=t.status==='andamento'&&t.data<hoje();
   const eHoje=t.status==='andamento'&&t.data===hoje();
   const deGerente=t.criadoPorRole==='gerente'&&t.vendedor!==t.criadoPor;
@@ -1113,11 +1135,57 @@ function tarefaCard(t){
     </div>
     ${t.obs?`<div class="task-obs">${esc(t.obs)}</div>`:''}
     <div class="task-actions">
+      ${c?`<button class="btn-sm" style="color:#5B21B6;border-color:#DDD6FE;background:#F5F3FF" onclick="verDadosCliente('${c.id}')">👁 Dados do cliente</button>`:''}
       <button class="btn-sm" onclick="abrirTarefa('${t.id}')">Editar</button>
       ${t.status==='andamento'?`<button class="btn-sm" style="background:var(--g-bg);color:var(--g-text);border-color:var(--g-border)" onclick="finalizarTarefa('${t.id}')">Finalizar</button>`:''}
       ${CFG.role==='gestor'?`<button class="btn-sm" style="color:#881337" onclick="deletarTarefa('${t.id}')">Remover</button>`:''}
     </div>
   </div>`;
+}
+
+function waIcon(num){
+  if(!num||!num.trim()) return '';
+  const limpo=num.replace(/\D/g,'');
+  if(limpo.length<8) return '';
+  const completo=limpo.startsWith('55')?limpo:'55'+limpo;
+  return `<button type="button" onclick="event.stopPropagation();window.open('https://wa.me/${completo}','whatsapp-crm')" title="Abrir no WhatsApp Web" style="background:none;border:none;cursor:pointer;padding:2px;flex-shrink:0;line-height:1"><svg viewBox="0 0 24 24" width="22" height="22" fill="#25D366"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.117.549 4.107 1.51 5.836L.057 23.571a.75.75 0 00.919.92l5.82-1.527A11.95 11.95 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.75a9.705 9.705 0 01-4.953-1.355l-.355-.211-3.658.959.976-3.563-.231-.368A9.713 9.713 0 012.25 12C2.25 6.615 6.615 2.25 12 2.25S21.75 6.615 21.75 12 17.385 21.75 12 21.75z"/></svg></button>`;
+}
+
+function verDadosClienteDeal(){
+  const id=document.getElementById('fd-clienteId')?.value;
+  if(id) verDadosCliente(id);
+}
+
+function verDadosCliente(id){
+  const c=clientes.find(x=>x.id===id); if(!c) return;
+  modal(`<h3>Dados do cliente</h3>
+    <div class="form-grid">
+      <div class="frow"><label>Razão Social</label><input value="${esc(c.razaoSocial||'')}" readonly></div>
+      <div class="frow"><label>Nome Fantasia</label><input value="${esc(c.nomeFantasia||'')}" readonly></div>
+      <div class="frow"><label>CNPJ / CPF</label><input value="${esc(c.cnpj||'')}" readonly></div>
+      <div class="frow"><label>WhatsApp</label>
+        <div style="display:flex;align-items:center;gap:6px">
+          <input value="${esc(c.whatsapp||'')}" readonly style="flex:1">
+          ${waIcon(c.whatsapp)}
+        </div>
+      </div>
+      <div class="frow"><label>Telefone</label><input value="${esc(c.tel||'')}" readonly></div>
+      <div class="frow"><label>Telefone 2</label><input value="${esc(c.tel2||'')}" readonly></div>
+      <div class="frow"><label>Telefone 3</label><input value="${esc(c.tel3||'')}" readonly></div>
+      <div class="frow"><label>E-mail</label><input value="${esc(c.email||'')}" readonly></div>
+      <div class="frow"><label>E-mail alternativo</label><input value="${esc(c.email2||'')}" readonly></div>
+      <div class="frow"><label>Contato (pessoa)</label><input value="${esc(c.contato||'')}" readonly></div>
+      <div class="frow"><label>Cidade</label><input value="${esc(c.cidade||'')}" readonly></div>
+      <div class="frow"><label>Estado</label><input value="${esc(c.estado||'')}" readonly></div>
+      <div class="frow"><label>Transportadora</label><input value="${esc(c.transportadora||'')}" readonly></div>
+      <div class="frow"><label>Status</label><input value="${esc(c.status||'')}" readonly></div>
+      <div class="frow"><label>Cód. Cliente</label><input value="${esc(c.codCliente||'')}" readonly></div>
+      <div class="frow"><label>Vendedor</label><input value="${esc(c.vendedor||'—')}" readonly></div>
+      <div class="frow full"><label>Observações</label><textarea readonly style="resize:none">${esc(c.obs||'')}</textarea></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-outline" onclick="fecharModal()">Fechar</button>
+    </div>`);
 }
 
 function abrirTarefa(id=null, preClienteId=''){
@@ -1279,7 +1347,12 @@ function abrirCliente(id=null){
       <div class="frow"><label>Razão Social *</label><input id="fc-rs" value="${esc(c.razaoSocial||'')}"></div>
       <div class="frow"><label>Nome Fantasia</label><input id="fc-nf" value="${esc(c.nomeFantasia||'')}"></div>
       <div class="frow"><label>CNPJ / CPF</label><input id="fc-cnpj" value="${esc(c.cnpj||'')}"></div>
-      <div class="frow"><label>WhatsApp</label><input id="fc-wa" value="${esc(c.whatsapp||'')}"></div>
+      <div class="frow"><label>WhatsApp</label>
+        <div style="display:flex;align-items:center;gap:6px">
+          <input id="fc-wa" value="${esc(c.whatsapp||'')}" style="flex:1">
+          ${waIcon(c.whatsapp)}
+        </div>
+      </div>
       <div class="frow"><label>Telefone</label><input id="fc-tel" value="${esc(c.tel||'')}"></div>
       <div class="frow"><label>Telefone 2</label><input id="fc-tel2" value="${esc(c.tel2||'')}"></div>
       <div class="frow"><label>Telefone 3</label><input id="fc-tel3" value="${esc(c.tel3||'')}"></div>
@@ -1288,6 +1361,7 @@ function abrirCliente(id=null){
       <div class="frow"><label>Contato (pessoa)</label><input id="fc-contato" value="${esc(c.contato||'')}"></div>
       <div class="frow"><label>Cidade</label><input id="fc-cidade" value="${esc(c.cidade||'')}"></div>
       <div class="frow"><label>Estado (UF)</label><input id="fc-estado" value="${esc(c.estado||'')}" maxlength="2"></div>
+      <div class="frow full"><label>Transportadora</label><input id="fc-transp" value="${esc(c.transportadora||'')}" placeholder="NOME DA TRANSPORTADORA"></div>
       <div class="frow">
         <label>Status</label>
         ${(CFG.role==='gestor'||CFG.role==='gerente')?`<select id="fc-status">${STATUS_CLIENTE.map(s=>`<option ${c.status===s?'selected':''}>${s}</option>`).join('')}</select>`:`<input id="fc-status" value="${esc(c.status||'LEADS')}" readonly style="background:var(--surface2);color:var(--text2)">`}
@@ -1362,7 +1436,7 @@ function salvarCliente(){
   let vendedorAssoc=g('fc-vend');
   if(!editClienteId||CFG.role==='vendedor') vendedorAssoc=editClienteId?clientes.find(c=>c.id===editClienteId)?.vendedor||'':'';
 
-  const obj={razaoSocial:rs,nomeFantasia:nf,cnpj,whatsapp:g('fc-wa').toUpperCase(),tel:g('fc-tel').toUpperCase(),tel2:g('fc-tel2').toUpperCase(),tel3:g('fc-tel3').toUpperCase(),email,email2:g('fc-email2').toUpperCase(),contato:g('fc-contato').toUpperCase(),cidade:g('fc-cidade').toUpperCase(),estado:g('fc-estado').toUpperCase(),status:g('fc-status')||'LEADS',codCliente,obs:g('fc-obs').toUpperCase()};
+  const obj={razaoSocial:rs,nomeFantasia:nf,cnpj,whatsapp:g('fc-wa').toUpperCase(),tel:g('fc-tel').toUpperCase(),tel2:g('fc-tel2').toUpperCase(),tel3:g('fc-tel3').toUpperCase(),email,email2:g('fc-email2').toUpperCase(),contato:g('fc-contato').toUpperCase(),cidade:g('fc-cidade').toUpperCase(),estado:g('fc-estado').toUpperCase(),transportadora:g('fc-transp').toUpperCase(),status:g('fc-status')||'LEADS',codCliente,obs:g('fc-obs').toUpperCase()};
   if(editClienteId){
     const idx=clientes.findIndex(c=>c.id===editClienteId);
     clientes[idx]={...clientes[idx],...obj};
@@ -1662,9 +1736,9 @@ function handleFile(file){
   r.onload=e=>{ const wb=XLSX.read(e.target.result,{type:'binary'}); const ws=wb.Sheets[wb.SheetNames[0]]; const rows=XLSX.utils.sheet_to_json(ws,{header:1}); importHeaders=rows[0]||[]; importData=rows.slice(1).filter(r=>r.some(c=>c)); mostrarMapeamento(); };
   r.readAsBinaryString(file);
 }
-const CMAP={'Cod. Cliente':'codCliente','Razão Social':'razaoSocial','Nome Fantasia':'nomeFantasia','CNPJ/CPF':'cnpj','WhatsApp':'whatsapp','Telefone':'tel','Telefone 2':'tel2','Telefone 3':'tel3','E-mail':'email','E-mail 2':'email2','Contato':'contato','Cidade':'cidade','Estado':'estado','Status':'status','Observações':'obs'};
+const CMAP={'Cod. Cliente':'codCliente','Razão Social':'razaoSocial','Nome Fantasia':'nomeFantasia','CNPJ/CPF':'cnpj','WhatsApp':'whatsapp','Telefone':'tel','Telefone 2':'tel2','Telefone 3':'tel3','E-mail':'email','E-mail 2':'email2','Contato':'contato','Cidade':'cidade','Estado':'estado','Transportadora':'transportadora','Status':'status','Observações':'obs'};
 const CAMPOS_IMP=['(ignorar)',...Object.keys(CMAP)];
-function autoMapI(h){ h=h.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,''); if(/cod|codigo|client/.test(h)) return 'Cod. Cliente'; if(/razao|rs/.test(h)) return 'Razão Social'; if(/fantasia|nf/.test(h)) return 'Nome Fantasia'; if(/cnpj|cpf/.test(h)) return 'CNPJ/CPF'; if(/whats|zap/.test(h)) return 'WhatsApp'; if(/tel3|fone3/.test(h)) return 'Telefone 3'; if(/tel2|fone2/.test(h)) return 'Telefone 2'; if(/tel|fone|celular/.test(h)) return 'Telefone'; if(/email2|mail2/.test(h)) return 'E-mail 2'; if(/email|mail/.test(h)) return 'E-mail'; if(/contato|responsavel/.test(h)) return 'Contato'; if(/cidade/.test(h)) return 'Cidade'; if(/estado|uf/.test(h)) return 'Estado'; if(/status/.test(h)) return 'Status'; if(/obs|nota/.test(h)) return 'Observações'; return '(ignorar)'; }
+function autoMapI(h){ h=h.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,''); if(/cod|codigo|client/.test(h)) return 'Cod. Cliente'; if(/razao|rs/.test(h)) return 'Razão Social'; if(/fantasia|nf/.test(h)) return 'Nome Fantasia'; if(/cnpj|cpf/.test(h)) return 'CNPJ/CPF'; if(/whats|zap/.test(h)) return 'WhatsApp'; if(/tel3|fone3/.test(h)) return 'Telefone 3'; if(/tel2|fone2/.test(h)) return 'Telefone 2'; if(/tel|fone|celular/.test(h)) return 'Telefone'; if(/email2|mail2/.test(h)) return 'E-mail 2'; if(/email|mail/.test(h)) return 'E-mail'; if(/contato|responsavel/.test(h)) return 'Contato'; if(/cidade/.test(h)) return 'Cidade'; if(/estado|uf/.test(h)) return 'Estado'; if(/transp/.test(h)) return 'Transportadora'; if(/status/.test(h)) return 'Status'; if(/obs|nota/.test(h)) return 'Observações'; return '(ignorar)'; }
 
 function mostrarMapeamento(){
   document.getElementById('import-body').innerHTML=`<h4 style="font-size:13px;font-weight:600;margin:1.25rem 0 .5rem">Mapear colunas</h4>
