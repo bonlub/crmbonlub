@@ -11,7 +11,7 @@
 (function(){
   const url=new URL(window.location.href);
   const stored=localStorage.getItem('crm_build');
-  const build='14';
+  const build='15';
   if(stored!==build){
     localStorage.setItem('crm_build',build);
     if(!url.searchParams.get('v')){
@@ -242,6 +242,25 @@ tbody tr:hover td{background:var(--surface2);}
 /* UTILS */
 .sep{height:0.5px;background:var(--border);margin:1rem 0;}
 .tag-gerente{display:inline-block;font-size:10px;font-weight:600;padding:1px 6px;border-radius:999px;background:#EDE9FE;color:#5B21B6;margin-left:4px;}
+
+/* NOTIFICAÇÃO TAREFAS VENCIDAS */
+.alert-vencidas{background:#FFF7ED;border:0.5px solid #FED7AA;border-radius:var(--radius-lg);padding:12px 16px;margin-bottom:1.25rem;display:flex;align-items:center;gap:10px;}
+.alert-vencidas-icon{font-size:20px;flex-shrink:0;}
+.alert-vencidas-text{font-size:13px;color:#9A3412;line-height:1.5;}
+.alert-vencidas-text strong{font-weight:600;}
+
+/* HISTÓRICO DE OBSERVAÇÕES */
+.obs-hist-item{padding:9px 11px;background:var(--surface2);border-radius:var(--radius);margin-bottom:5px;font-size:12px;border-left:3px solid var(--border2);}
+.obs-hist-meta{font-size:10px;color:var(--text3);margin-bottom:3px;}
+.obs-hist-text{color:var(--text);line-height:1.5;}
+
+/* RELATÓRIO */
+.relatorio-card{background:var(--surface);border:0.5px solid var(--border);border-radius:var(--radius-lg);padding:1.25rem;margin-bottom:1rem;}
+.relatorio-vendedor{font-size:15px;font-weight:600;margin-bottom:.75rem;padding-bottom:.5rem;border-bottom:0.5px solid var(--border);}
+.relatorio-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;}
+.relatorio-stat{background:var(--surface2);border-radius:var(--radius);padding:8px 10px;text-align:center;}
+.relatorio-stat-label{font-size:10px;font-weight:500;color:var(--text3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px;}
+.relatorio-stat-val{font-size:18px;font-weight:600;}
 </style>
 </head>
 <body>
@@ -249,7 +268,7 @@ tbody tr:hover td{background:var(--surface2);}
 <!-- LOGIN -->
 <div id="login-screen">
   <div class="login-card">
-    <div class="login-logo">CRM <span style="font-size:12px;font-weight:400;color:var(--text3)">v14.9.3</span></div>
+    <div class="login-logo">CRM <span style="font-size:12px;font-weight:400;color:var(--text3)">v15.2</span></div>
     <div class="login-sub">Acesse sua conta</div>
     <label>Usuário</label>
     <input id="lg-user" placeholder="Seu nome" style="text-transform:none" oninput="this.value=this.value.replace(/[^a-zA-Z\s]/g,'')">
@@ -264,7 +283,7 @@ tbody tr:hover td{background:var(--surface2);}
 <div id="app">
   <div class="topbar">
     <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-      <span class="topbar-logo">CRM <span style="font-size:10px;font-weight:400;color:var(--text3)">v14.9.3</span></span>
+      <span class="topbar-logo">CRM <span style="font-size:10px;font-weight:400;color:var(--text3)">v15.2</span></span>
       <nav class="nav">
         <button class="nav-btn active" onclick="nav('funil',this)">Funil</button>
         <button class="nav-btn" onclick="nav('tarefas',this)" id="btn-nav-tarefas">Tarefas<span class="nav-badge" id="badge-tarefas" style="display:none">0</span></button>
@@ -272,7 +291,9 @@ tbody tr:hover td{background:var(--surface2);}
         <button class="nav-btn" onclick="nav('dashboard',this)">Dashboard</button>
         <button class="nav-btn" id="btn-nav-vendors" style="display:none" onclick="nav('vendedores',this)">Equipe</button>
         <button class="nav-btn" id="btn-nav-importar" style="display:none" onclick="nav('importar',this)">Importar</button>
+        <button class="nav-btn" id="btn-nav-relatorio" style="display:none" onclick="nav('relatorio',this)">Relatório</button>
         <button class="nav-btn" id="btn-nav-config" style="display:none" onclick="nav('config',this)">⚙ Config</button>
+        <button class="nav-btn" id="btn-nav-log" style="display:none" onclick="nav('log',this)">📋 Log</button>
       </nav>
     </div>
     <div style="display:flex;align-items:center;gap:8px">
@@ -307,19 +328,19 @@ tbody tr:hover td{background:var(--surface2);}
       </div>
       <div class="kanban">
         <div class="kb-col col-contato" id="drop-contato" ondragover="onDragOver(event,'contato')" ondragleave="onDragLeave()" ondrop="onDrop(event,'contato')">
-          <div class="col-header"><div class="col-title"><div class="col-dot"></div>Contato</div><span class="col-count" id="cnt-contato">0</span></div>
+          <div class="col-header"><div class="col-title"><div class="col-dot"></div>Contato</div><div style="text-align:right"><span class="col-count" id="cnt-contato">0</span><div id="val-contato" style="font-size:10px;color:var(--c-text);font-family:var(--mono);margin-top:2px"></div></div></div>
           <div class="col-body" id="col-contato"></div>
         </div>
         <div class="kb-col col-orcamento" id="drop-orcamento" ondragover="onDragOver(event,'orcamento')" ondragleave="onDragLeave()" ondrop="onDrop(event,'orcamento')">
-          <div class="col-header"><div class="col-title"><div class="col-dot"></div>Orçamento</div><span class="col-count" id="cnt-orcamento">0</span></div>
+          <div class="col-header"><div class="col-title"><div class="col-dot"></div>Orçamento</div><div style="text-align:right"><span class="col-count" id="cnt-orcamento">0</span><div id="val-orcamento" style="font-size:10px;color:var(--o-text);font-family:var(--mono);margin-top:2px"></div></div></div>
           <div class="col-body" id="col-orcamento"></div>
         </div>
         <div class="kb-col col-ganho" id="drop-ganho" ondragover="onDragOver(event,'ganho')" ondragleave="onDragLeave()" ondrop="onDrop(event,'ganho')">
-          <div class="col-header"><div class="col-title"><div class="col-dot"></div>Venda efetivada</div><span class="col-count" id="cnt-ganho">0</span></div>
+          <div class="col-header"><div class="col-title"><div class="col-dot"></div>Venda efetivada</div><div style="text-align:right"><span class="col-count" id="cnt-ganho">0</span><div id="val-ganho" style="font-size:10px;color:var(--g-text);font-family:var(--mono);margin-top:2px"></div></div></div>
           <div class="col-body" id="col-ganho"></div>
         </div>
         <div class="kb-col col-perdido" id="drop-perdido" ondragover="onDragOver(event,'perdido')" ondragleave="onDragLeave()" ondrop="onDrop(event,'perdido')">
-          <div class="col-header"><div class="col-title"><div class="col-dot"></div>Venda perdida</div><span class="col-count" id="cnt-perdido">0</span></div>
+          <div class="col-header"><div class="col-title"><div class="col-dot"></div>Venda perdida</div><div style="text-align:right"><span class="col-count" id="cnt-perdido">0</span><div id="val-perdido" style="font-size:10px;color:var(--p-text);font-family:var(--mono);margin-top:2px"></div></div></div>
           <div class="col-body" id="col-perdido"></div>
         </div>
       </div>
@@ -343,6 +364,7 @@ tbody tr:hover td{background:var(--surface2);}
           <button class="btn-primary" onclick="abrirTarefa()">+ Nova tarefa</button>
         </div>
       </div>
+      <div id="alerta-vencidas"></div>
       <div id="tarefas-body"></div>
     </div>
 
@@ -359,6 +381,9 @@ tbody tr:hover td{background:var(--surface2);}
           <option value="CLIENTE ATIVO">Cliente Ativo</option>
           <option value="CLIENTE INATIVO">Cliente Inativo</option>
           <option value="LEADS">Leads</option>
+        </select>
+        <select id="f-cat" onchange="renderClientes()" style="min-width:150px">
+          <option value="">Todas as categorias</option>
         </select>
         <select id="f-novos" onchange="renderClientes()" style="min-width:160px;display:none">
           <option value="">Todos os cadastros</option>
@@ -420,6 +445,35 @@ tbody tr:hover td{background:var(--surface2);}
     </div>
 
     <!-- CONFIG (gestor only) -->
+    <!-- LOG DE ATIVIDADES -->
+    <div id="sec-log" class="section">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem;flex-wrap:wrap;gap:8px">
+        <h2 style="font-size:16px;font-weight:600">📋 Log de atividades</h2>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <input type="date" id="log-de" style="padding:6px 10px;font-size:12px;border:0.5px solid var(--border2);border-radius:var(--radius);background:var(--surface);color:var(--text)" onchange="renderLog()">
+          <span style="font-size:11px;color:var(--text3)">até</span>
+          <input type="date" id="log-ate" style="padding:6px 10px;font-size:12px;border:0.5px solid var(--border2);border-radius:var(--radius);background:var(--surface);color:var(--text)" onchange="renderLog()">
+          <select id="log-user" style="padding:6px 10px;font-size:12px;border:0.5px solid var(--border2);border-radius:var(--radius);background:var(--surface);color:var(--text);font-family:var(--font)" onchange="renderLog()">
+            <option value="">Todos os usuários</option>
+          </select>
+          <select id="log-tipo" style="padding:6px 10px;font-size:12px;border:0.5px solid var(--border2);border-radius:var(--radius);background:var(--surface);color:var(--text);font-family:var(--font)" onchange="renderLog()">
+            <option value="">Todos os tipos</option>
+            <option value="login">Login</option>
+            <option value="cliente">Cliente</option>
+            <option value="deal">Negócio</option>
+            <option value="tarefa">Tarefa</option>
+          </select>
+          <button class="btn-sm" onclick="log_=[];saveLocal();renderLog();" style="color:#881337">Limpar log</button>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Data/Hora</th><th>Usuário</th><th>Tipo</th><th>Ação</th><th>Detalhe</th></tr></thead>
+          <tbody id="tbody-log"></tbody>
+        </table>
+      </div>
+    </div>
+
     <div id="sec-config" class="section">
       <h2 style="font-size:16px;font-weight:600;margin-bottom:1.25rem">⚙ Configurações do sistema</h2>
       <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px">
@@ -455,13 +509,34 @@ tbody tr:hover td{background:var(--surface2);}
         </div>
 
         <div style="background:var(--surface);border:0.5px solid var(--border);border-radius:var(--radius-lg);padding:1.25rem">
-          <div style="font-size:13px;font-weight:600;margin-bottom:.75rem">Resetar dados de demonstração</div>
+          <div style="font-size:13px;font-weight:600;margin-bottom:.75rem">Categorias de clientes</div>
+          <div id="cfg-cat-lista" style="margin-bottom:10px"></div>
+          <div style="display:flex;gap:6px">
+            <input id="cfg-nova-cat" placeholder="NOVA CATEGORIA..." style="flex:1;padding:7px 10px;border:0.5px solid var(--border2);border-radius:var(--radius);font-size:13px;font-family:var(--font);background:var(--surface);color:var(--text)">
+            <button class="btn-outline" onclick="adicionarCategoria()">Adicionar</button>
+          </div>
+        </div>
           <p style="font-size:12px;color:var(--text2);margin-bottom:1rem;line-height:1.6">Remove todos os clientes, negócios e tarefas de exemplo. Use apenas ao iniciar o sistema pela primeira vez.</p>
           <button class="btn-outline" style="color:#881337;border-color:#FECDD3;width:100%" onclick="resetarDadosDemo()">Limpar dados de demonstração</button>
         </div>
 
       </div>
     </div>
+    <!-- RELATÓRIO -->
+    <div id="sec-relatorio" class="section">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem;flex-wrap:wrap;gap:8px">
+        <h2 style="font-size:16px;font-weight:600">Relatório de desempenho</h2>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <input type="date" id="rel-de" style="padding:6px 10px;font-size:12px;border:0.5px solid var(--border2);border-radius:var(--radius);background:var(--surface);color:var(--text)">
+          <span style="font-size:11px;color:var(--text3)">até</span>
+          <input type="date" id="rel-ate" style="padding:6px 10px;font-size:12px;border:0.5px solid var(--border2);border-radius:var(--radius);background:var(--surface);color:var(--text)">
+          <button class="btn-primary" onclick="gerarRelatorio()">Gerar</button>
+          <button class="btn-outline btn-green" onclick="exportarRelatorioExcel()">Exportar Excel</button>
+        </div>
+      </div>
+      <div id="relatorio-body"><p style="font-size:13px;color:var(--text3)">Selecione o período e clique em Gerar.</p></div>
+    </div>
+
     <div id="sec-importar" class="section">
       <div style="background:var(--surface);border:0.5px solid var(--border);border-radius:var(--radius-lg);padding:1.75rem;max-width:640px">
         <h3 style="font-size:15px;font-weight:600;margin-bottom:.5rem">Importar clientes</h3>
@@ -488,7 +563,7 @@ tbody tr:hover td{background:var(--surface2);}
 // ══════════════════════════════════════════════════════════
 //  STATE
 // ══════════════════════════════════════════════════════════
-let CFG={}, deals=[], clientes=[], vendedores=[], tarefas=[], usuarios=[];
+let CFG={}, deals=[], clientes=[], vendedores=[], tarefas=[], usuarios=[], log_=[];
 let importData=[], importHeaders=[];
 let editDealId=null, editClienteId=null, editVendedorId=null, editTarefaId=null;
 let dragId=null;
@@ -521,6 +596,7 @@ function fazerLogin(){
   if(!u||u.senha!==senha){ toast('Usuário ou senha incorretos.','err'); return; }
   CFG={nome:u.nome,role:u.role};
   localStorage.setItem('crm6_session',JSON.stringify(CFG));
+  registrarLog('login','Login realizado',`Perfil: ${u.role}`);
   if(u.primeiroacesso){ pedirNovaSenha(u); return; }
   iniciarApp();
 }
@@ -579,13 +655,16 @@ function iniciarApp(){
     document.getElementById('btn-nav-vendors').style.display='';
     document.getElementById('btn-nav-importar').style.display='';
     document.getElementById('btn-nav-config').style.display='';
+    document.getElementById('btn-nav-log').style.display='';
     document.getElementById('f-novos').style.display='';
     document.getElementById('btn-exportar-c').style.display='';
+    document.getElementById('btn-nav-relatorio').style.display='';
   }
+  if(CFG.role==='gerente') document.getElementById('btn-nav-relatorio').style.display='';
   checar90dias(); checarClientesInativos();
   carregarConfig();
   const ini=mesCorrienteInicio(), fim=mesCorrienteFim();
-  ['kb-de','kb-ate','t-de','t-ate','dash-de','dash-ate','c-de','c-ate'].forEach(id=>{
+  ['kb-de','kb-ate','t-de','t-ate','dash-de','dash-ate','c-de','c-ate','rel-de','rel-ate','log-de','log-ate'].forEach(id=>{
     const el=document.getElementById(id); if(el){ el.value=id.endsWith('-de')||id==='dash-de'?ini:fim; }
   });
   const ts=document.getElementById('t-status'); if(ts) ts.value='andamento';
@@ -593,7 +672,34 @@ function iniciarApp(){
   carregarDoFirebase().then(carregou=>{
     if(carregou) toast('Dados sincronizados!','ok');
     renderAll(); atualizarBadgeTarefas();
+    // Notificação de tarefas ao logar (somente vendedor e gerente)
+    if(CFG.role!=='gestor') setTimeout(()=>notificarTarefasLogin(),800);
   });
+}
+
+function notificarTarefasLogin(){
+  const hoje_=hoje();
+  const minhasTarefas=tarefas.filter(t=>{
+    if(t.status!=='andamento') return false;
+    if(CFG.role==='vendedor'&&t.vendedor!==CFG.nome) return false;
+    if(CFG.role==='gerente'&&!meuGrupo().includes(t.vendedor)) return false;
+    return true;
+  });
+  const vencidas=minhasTarefas.filter(t=>t.data<hoje_).length;
+  const deHoje=minhasTarefas.filter(t=>t.data===hoje_).length;
+  if(!vencidas&&!deHoje) return;
+  const msgs=[];
+  if(deHoje) msgs.push(`<strong>${deHoje}</strong> tarefa${deHoje>1?'s':''} para hoje`);
+  if(vencidas) msgs.push(`<strong>${vencidas}</strong> tarefa${vencidas>1?'s':''} vencida${vencidas>1?'s':''}`);
+  modal(`<div style="text-align:center;padding:.5rem 0">
+    <div style="font-size:32px;margin-bottom:.75rem">📋</div>
+    <h3 style="margin-bottom:.5rem">Olá, ${esc(CFG.nome.split(' ')[0])}!</h3>
+    <p style="font-size:14px;color:var(--text2);line-height:1.7;margin-bottom:1.25rem">${msgs.join('<br>')}</p>
+    <div class="modal-actions" style="justify-content:center;gap:8px">
+      <button class="btn-outline" onclick="fecharModal()">Fechar</button>
+      <button class="btn-primary" onclick="fecharModal();document.querySelector('[onclick*=tarefas]').click()">Ver tarefas</button>
+    </div>
+  </div>`);
 }
 
 // ══════════════════════════════════════════════════════════
@@ -605,6 +711,7 @@ function saveLocal(){
   localStorage.setItem('crm6_vendors',JSON.stringify(vendedores));
   localStorage.setItem('crm6_tarefas',JSON.stringify(tarefas));
   localStorage.setItem('crm6_usuarios',JSON.stringify(usuarios));
+  localStorage.setItem('crm6_log',JSON.stringify(log_.slice(-500))); // máximo 500 entradas
 }
 async function syncManual(){
   const btn=document.getElementById('btn-sync');
@@ -742,7 +849,32 @@ function nav(name,btn){
   btn.classList.add('active');
   renderAll();
 }
-function renderAll(){ limparDadosDeOutrosVendedores(); renderFunil(); renderTarefas(); renderClientes(); renderDashboard(); renderVendedores(); populaFiltros(); atualizarBadgeTarefas(); renderConfig(); }
+function renderAll(){ limparDadosDeOutrosVendedores(); renderFunil(); renderTarefas(); renderClientes(); renderDashboard(); renderVendedores(); populaFiltros(); atualizarBadgeTarefas(); renderConfig(); renderLog(); }
+
+// ══════════════════════════════════════════════════════════
+//  NOTIFICAÇÃO TAREFAS VENCIDAS
+// ══════════════════════════════════════════════════════════
+function renderAlertaVencidas(){
+  const el=document.getElementById('alerta-vencidas'); if(!el) return;
+  const hoje_=hoje();
+  const vencidas=tarefas.filter(t=>{
+    if(t.status!=='andamento') return false;
+    if(CFG.role==='vendedor'&&t.vendedor!==CFG.nome) return false;
+    if(CFG.role==='gerente'&&!meuGrupo().includes(t.vendedor)) return false;
+    return t.data<hoje_;
+  });
+  const hoje_count=tarefas.filter(t=>{
+    if(t.status!=='andamento') return false;
+    if(CFG.role==='vendedor'&&t.vendedor!==CFG.nome) return false;
+    if(CFG.role==='gerente'&&!meuGrupo().includes(t.vendedor)) return false;
+    return t.data===hoje_;
+  }).length;
+  if(!vencidas.length&&!hoje_count){ el.innerHTML=''; return; }
+  let msgs=[];
+  if(vencidas.length) msgs.push(`<strong>${vencidas.length} tarefa${vencidas.length>1?'s':''} vencida${vencidas.length>1?'s':''}</strong> (prazo expirado)`);
+  if(hoje_count) msgs.push(`<strong>${hoje_count} tarefa${hoje_count>1?'s':''}</strong> para hoje`);
+  el.innerHTML=`<div class="alert-vencidas"><div class="alert-vencidas-icon">⚠️</div><div class="alert-vencidas-text">${msgs.join(' · ')}</div></div>`;
+}
 
 // ══════════════════════════════════════════════════════════
 //  FUNIL
@@ -772,6 +904,9 @@ function renderFunil(){
       return true;
     });
     document.getElementById('cnt-'+etapa).textContent=lista.length;
+    const totalVal=lista.reduce((a,d)=>a+Number(d.valor||0),0);
+    const velEl=document.getElementById('val-'+etapa);
+    if(velEl) velEl.textContent=totalVal>0?fmt(totalVal):'';
     const col=document.getElementById('col-'+etapa);
     col.innerHTML=lista.length?lista.map(d=>dealCard(d)).join(''):'<div class="col-empty">Nenhum negócio</div>';
   });
@@ -789,6 +924,7 @@ function dealCard(d){
     <div class="deal-title">${esc(cn||'—')}</div>
     ${c&&c.cnpj?`<div class="deal-sub">${esc(c.cnpj)}</div>`:''}
     <div class="deal-meta"><span class="deal-value">${fmt(d.valor)}</span><span class="deal-vendor">${esc(d.vendedor||'—')}</span></div>
+    ${d.numOrcamento?`<div style="font-size:10px;color:var(--o-text);background:var(--o-bg);border-radius:4px;padding:2px 6px;margin-top:3px;display:inline-block">Orç: ${esc(d.numOrcamento)}</div>`:''}
     ${d.etapa==='perdido'&&d.motivo?`<div class="deal-motivo">${esc(d.motivo)}</div>`:''}
     ${podeEditar?`<div class="deal-actions" onclick="event.stopPropagation()">
       ${!finalizado&&nextE?`<button class="deal-btn adv" onclick="event.stopPropagation();avancar('${d.id}')">→ ${ELABEL[nextE]}</button>`:''}
@@ -797,6 +933,7 @@ function dealCard(d){
       ${finalizado?`<span style="font-size:10px;color:var(--text3)">Finalizado</span>`:''}
       <button class="deal-btn" onclick="event.stopPropagation();abrirDeal('${d.id}')">Ver</button>
       ${d.clienteId?`<button class="deal-btn" style="color:#5B21B6;border-color:#DDD6FE;background:#F5F3FF" onclick="event.stopPropagation();verDadosCliente('${d.clienteId}')">👁 Cliente</button>`:''}
+      ${finalizado?`<button class="deal-btn" onclick="event.stopPropagation();duplicarDeal('${d.id}')" title="Abrir novo negócio baseado neste">⧉ Duplicar</button>`:''}
       ${CFG.role==='gestor'?`<button class="deal-btn red" onclick="event.stopPropagation();deletarDeal('${d.id}')">Remover</button>`:''}
     </div>`:''}
   </div>`;
@@ -813,33 +950,87 @@ function onDrop(e,etapa){
   const d=deals.find(x=>x.id===dragId);
   if(!d||d.etapa===etapa) return;
   if(d.etapa==='ganho'||d.etapa==='perdido'){ toast('Negócio finalizado não pode ser movido. Abra novo negócio.','warn'); return; }
-  if(etapa==='perdido'){ const m=prompt('Motivo da perda (obrigatório):'); if(!m||!m.trim()) return; moverEtapa(d,'perdido',m.trim().toUpperCase()); return; }
-  if(etapa==='ganho'){ moverParaGanho(d); return; }
+  if(etapa==='perdido'){ pedirMotivoPerda(d); return; }
+  if(etapa==='orcamento'||etapa==='ganho'){ pedirNumOrcamento(d, etapa); return; }
   moverEtapa(d,etapa);
+}
+
+function pedirNumOrcamento(d, etapaDestino){
+  // Se já tem número de orçamento e vai para ganho, pular para moverParaGanho
+  if(etapaDestino==='ganho'&&d.numOrcamento){
+    moverParaGanho(d); return;
+  }
+  modal(`<h3>Número do orçamento obrigatório</h3>
+    <p style="font-size:13px;color:var(--text2);margin-bottom:1rem;line-height:1.6">
+      Para mover para <strong>${ELABEL[etapaDestino]}</strong> é necessário informar o número do orçamento.
+    </p>
+    <div class="frow" style="margin-bottom:1rem">
+      <label>Número do orçamento *</label>
+      <input id="inp-num-orc" placeholder="EX: ORC-2024-001" autofocus value="${esc(d.numOrcamento||'')}">
+    </div>
+    <div class="modal-actions">
+      <button class="btn-outline" onclick="fecharModal()">Cancelar</button>
+      <button class="btn-primary" onclick="confirmarNumOrcamento('${d.id}','${etapaDestino}')">Confirmar</button>
+    </div>`);
+}
+
+function confirmarNumOrcamento(dealId, etapaDestino){
+  const num=document.getElementById('inp-num-orc').value.trim().toUpperCase();
+  if(!num){ toast('Informe o número do orçamento.','err'); return; }
+  const d=deals.find(x=>x.id===dealId); if(!d) return;
+  d.numOrcamento=num;
+  fecharModal();
+  if(etapaDestino==='ganho'){ moverParaGanho(d); }
+  else { moverEtapa(d,etapaDestino); }
+}
+
+function pedirMotivoPerda(d){
+  modal(`<h3>Motivo da perda obrigatório</h3>
+    <div class="frow" style="margin-bottom:1rem">
+      <label>Motivo *</label>
+      <input id="inp-motivo-perda" placeholder="INFORME O MOTIVO..." autofocus>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-outline" onclick="fecharModal()">Cancelar</button>
+      <button class="btn-primary" style="background:#881337;border-color:#881337" onclick="confirmarMotivoPerdaDeal('${d.id}')">Confirmar perda</button>
+    </div>`);
+}
+
+function confirmarMotivoPerdaDeal(dealId){
+  const m=document.getElementById('inp-motivo-perda').value.trim().toUpperCase();
+  if(!m){ toast('Informe o motivo.','err'); return; }
+  const d=deals.find(x=>x.id===dealId); if(!d) return;
+  fecharModal();
+  moverEtapa(d,'perdido',m);
+  setTimeout(()=>abrirAgendamentoPosFinal(d.clienteId),400);
 }
 
 function moverEtapa(d,etapa,motivo=''){
   d.etapa=etapa; if(motivo) d.motivo=motivo;
   d.historico=d.historico||[];
-  d.historico.push({etapa,data:hoje(),obs:motivo||''});
+  d.historico.push({etapa,data:hoje(),obs:motivo||'',autor:CFG.nome});
+  registrarLog('deal',`Negócio movido para ${ELABEL[etapa]}`,`Cliente: ${nomeCliente(d.clienteId)}`);
   saveLocal(); syncRemote(); renderFunil(); renderDashboard();
   toast('Movido para '+ELABEL[etapa],'ok');
 }
 
 function avancar(id){
   const d=deals.find(x=>x.id===id); if(!d||!NEXT[d.etapa]) return;
-  if(NEXT[d.etapa]==='ganho'){ moverParaGanho(d); return; }
-  moverEtapa(d,NEXT[d.etapa]);
+  const destino=NEXT[d.etapa];
+  if(destino==='ganho'){ 
+    if(!d.numOrcamento){ pedirNumOrcamento(d,'ganho'); return; }
+    moverParaGanho(d); return; 
+  }
+  if(destino==='orcamento'){
+    pedirNumOrcamento(d,'orcamento'); return;
+  }
+  moverEtapa(d,destino);
 }
 
 function perder(id){
   const d=deals.find(x=>x.id===id); if(!d) return;
   if(d.etapa==='ganho'||d.etapa==='perdido'){ toast('Negócio já finalizado.','warn'); return; }
-  const m=prompt('Motivo da perda (obrigatório):');
-  if(!m||!m.trim()) return;
-  // Após mover pra perdida abre agendamento de tarefa
-  moverEtapa(d,'perdido',m.trim().toUpperCase());
-  setTimeout(()=>abrirAgendamentoPosFinal(d.clienteId),400);
+  pedirMotivoPerda(d);
 }
 
 function moverParaGanho(d){
@@ -868,6 +1059,14 @@ function _finalizarGanho(d){
   vincularVendedor(d);
   if(eraInativo){ cAntes.status='CLIENTE ATIVO'; cAntes.reativacoes=(cAntes.reativacoes||0)+1; }
   else if(cAntes) cAntes.status='CLIENTE ATIVO';
+  // Atualizar valor potencial com média das vendas efetivadas
+  if(cAntes){
+    const vendasCliente=deals.filter(dl=>dl.clienteId===cAntes.id&&dl.etapa==='ganho'&&Number(dl.valor)>0);
+    if(vendasCliente.length>0){
+      const media=vendasCliente.reduce((a,dl)=>a+Number(dl.valor),0)/vendasCliente.length;
+      cAntes.valorPotencial=Math.round(media*100)/100;
+    }
+  }
   moverEtapa(d,'ganho');
   setTimeout(()=>abrirAgendamentoPosFinal(d.clienteId),400);
 }
@@ -899,13 +1098,44 @@ function vincularVendedor(d){
 
 function abrirAgendamentoPosFinal(clienteId){
   const cn=nomeCliente(clienteId);
-  modal(`<h3>Agendar próximo contato</h3>
-    <p style="font-size:13px;color:var(--text2);margin-bottom:1rem;line-height:1.6">Agende o próximo contato para <strong>${esc(cn)}</strong>. O agendamento é obrigatório.</p>
-    <div class="frow" style="margin-bottom:10px"><label>Data do próximo contato *</label><input type="date" id="ag-data" value="${hoje()}"></div>
-    <div class="frow"><label>Observação</label><textarea id="ag-obs" placeholder="DETALHE DO PRÓXIMO CONTATO..."></textarea></div>
-    <div class="modal-actions">
-      <button class="btn-primary" onclick="confirmarAgendamento('${clienteId}')">Agendar</button>
+  modal(`<h3>Próximo contato — ${esc(cn)}</h3>
+    <p style="font-size:13px;color:var(--text2);margin-bottom:1rem;line-height:1.6">Escolha entre agendar o próximo contato ou registrar o motivo de não reagendamento.</p>
+    <div style="display:flex;gap:8px;margin-bottom:1rem">
+      <button id="btn-reagendar" class="btn-primary" style="flex:1" onclick="toggleAgendamento('sim')">📅 Agendar contato</button>
+      <button id="btn-nao-reagendar" class="btn-outline" style="flex:1" onclick="toggleAgendamento('nao')">✕ Não reagendar</button>
+    </div>
+    <div id="bloco-agendar" style="display:none">
+      <div class="frow" style="margin-bottom:10px"><label>Data do próximo contato *</label><input type="date" id="ag-data" value="${hoje()}"></div>
+      <div class="frow" style="margin-bottom:1rem"><label>Observação</label><textarea id="ag-obs" placeholder="DETALHE DO PRÓXIMO CONTATO..."></textarea></div>
+      <div class="modal-actions"><button class="btn-primary" onclick="confirmarAgendamento('${clienteId}')">Confirmar agendamento</button></div>
+    </div>
+    <div id="bloco-nao-agendar" style="display:none">
+      <div class="frow" style="margin-bottom:1rem"><label>Motivo de não reagendar *</label><textarea id="ag-motivo" placeholder="INFORME O MOTIVO..."></textarea></div>
+      <div class="modal-actions"><button class="btn-primary" onclick="confirmarNaoReagendar('${clienteId}')">Confirmar</button></div>
     </div>`);
+}
+
+function toggleAgendamento(modo){
+  document.getElementById('bloco-agendar').style.display=modo==='sim'?'block':'none';
+  document.getElementById('bloco-nao-agendar').style.display=modo==='nao'?'block':'none';
+  document.getElementById('btn-reagendar').style.background=modo==='sim'?'var(--text)':'';
+  document.getElementById('btn-reagendar').style.color=modo==='sim'?'var(--surface)':'';
+  document.getElementById('btn-nao-reagendar').style.background=modo==='nao'?'var(--text)':'';
+  document.getElementById('btn-nao-reagendar').style.color=modo==='nao'?'var(--surface)':'';
+}
+
+function confirmarNaoReagendar(clienteId){
+  const motivo=document.getElementById('ag-motivo').value.trim().toUpperCase();
+  if(!motivo){ toast('Informe o motivo de não reagendar.','err'); return; }
+  // Registra como observação no histórico do cliente
+  const c=clientes.find(x=>x.id===clienteId);
+  if(c){
+    if(!c.obsHistorico) c.obsHistorico=[];
+    c.obsHistorico.push({data:hoje(),autor:CFG.nome,texto:`NÃO REAGENDADO — MOTIVO: ${motivo}`});
+    saveLocal();
+  }
+  registrarLog('tarefa','Contato não reagendado',`Cliente: ${nomeCliente(clienteId)} | Motivo: ${motivo}`);
+  fecharModal(); toast('Motivo registrado no histórico do cliente.','ok');
 }
 
 function confirmarAgendamento(clienteId){
@@ -920,6 +1150,7 @@ function deletarDeal(id){
   if(CFG.role!=='gestor'){ toast('Somente o gestor pode remover negócios.','err'); return; }
   confirmar('Remover este negócio permanentemente?', ()=>{
     deals=deals.filter(d=>d.id!==id); saveLocal(); syncRemote(); renderFunil(); renderDashboard();
+    registrarLog('deal','Negócio removido',`ID: ${id}`);
     toast('Negócio removido.','ok');
   });
 }
@@ -927,16 +1158,33 @@ function deletarDeal(id){
 // ══════════════════════════════════════════════════════════
 //  MODAL DEAL
 // ══════════════════════════════════════════════════════════
+function duplicarDeal(id){
+  const orig=deals.find(d=>d.id===id); if(!orig) return;
+  const novo={
+    id:uid(),
+    clienteId:orig.clienteId,
+    valor:orig.valor,
+    vendedor:orig.vendedor||CFG.nome,
+    data:hoje(),
+    etapa:'contato',
+    obs:orig.obs,
+    motivo:'',
+    historico:[{etapa:'contato',data:hoje(),obs:'DUPLICADO DE NEGÓCIO ANTERIOR'}]
+  };
+  deals.push(novo);
+  saveLocal(); syncRemote(); renderFunil();
+  toast('Negócio duplicado e movido para Contato.','ok');
+}
+
 function abrirDealParaCliente(clienteId){
-  // Abre modal de negócio com cliente pré-selecionado
   abrirDeal(null, clienteId);
 }
 
-function abrirDeal(id=null, preClienteId=null){
+function abrirDeal(id=null, preClienteId=null, preVendedor=null){
   editDealId=id;
   const d=id?deals.find(x=>x.id===id):{};
   const isGerente=CFG.role==='gerente'; if(isGerente&&!id) return;
-  const defaultV=CFG.role==='vendedor'?CFG.nome:(d.vendedor||'');
+  const defaultV=preVendedor||(CFG.role==='vendedor'?CFG.nome:(d.vendedor||''));
   const vOpts=usuarios.filter(v=>v.role==='vendedor').map(v=>`<option ${v.nome===defaultV?'selected':''}>${esc(v.nome)}</option>`).join('');
   const etapaAtual=d.etapa||'contato';
   const finalizado=etapaAtual==='ganho'||etapaAtual==='perdido';
@@ -956,6 +1204,7 @@ function abrirDeal(id=null, preClienteId=null){
         </div>
       </div>
       <div class="frow"><label>Valor (R$)</label><input id="fd-valor" type="number" min="0" step="0.01" value="${d.valor||''}"></div>
+      <div class="frow"><label>Nº do Orçamento ${(etapaAtual==='orcamento'||etapaAtual==='ganho')?'<span style="color:var(--p-text);font-size:9px">*obrigatório</span>':''}</label><input id="fd-num-orc" value="${esc(d.numOrcamento||'')}" placeholder="EX: ORC-2024-001"></div>
       <div class="frow"><label>Vendedor responsável</label>
         ${CFG.role==='vendedor'?`<input id="fd-vend" value="${esc(CFG.nome)}" readonly>`:`<select id="fd-vend"><option value="">— selecione —</option>${vOpts}</select>`}
       </div>
@@ -1002,17 +1251,21 @@ function salvarDeal(){
     }
   }
 
-  const obj={clienteId,valor:parseFloat(g('fd-valor'))||0,vendedor:g('fd-vend'),data:g('fd-data')||hoje(),etapa,motivo,obs:g('fd-obs').toUpperCase()};
+  const numOrcamento=g('fd-num-orc').toUpperCase();
+  if((etapa==='orcamento'||etapa==='ganho')&&!numOrcamento){ toast('Informe o número do orçamento.','err'); return; }
+  const obj={clienteId,valor:parseFloat(g('fd-valor'))||0,vendedor:g('fd-vend'),data:g('fd-data')||hoje(),etapa,motivo,obs:g('fd-obs').toUpperCase(),numOrcamento};
   if(editDealId){
     const idx=deals.findIndex(d=>d.id===editDealId);
     const hist=deals[idx].historico||[];
     if(deals[idx].etapa!==etapa) hist.push({etapa,data:hoje(),obs:motivo||obj.obs});
     deals[idx]={...deals[idx],...obj,historico:hist};
     if(etapa==='ganho') _finalizarGanhoSilencioso(deals[idx]);
+    registrarLog('deal','Negócio editado',`Cliente: ${nomeCliente(obj.clienteId)} | Etapa: ${ELABEL[etapa]}`);
   } else {
     const nd={id:uid(),...obj,historico:[{etapa,data:obj.data,obs:obj.obs}]};
     deals.push(nd);
     if(etapa==='ganho') _finalizarGanhoSilencioso(nd);
+    registrarLog('deal','Negócio criado',`Cliente: ${nomeCliente(obj.clienteId)} | Etapa: ${ELABEL[etapa]}`);
   }
   saveLocal(); syncRemote(); fecharModal(); renderFunil(); renderDashboard();
   // Agendamento opcional no deal (contato/orçamento)
@@ -1083,6 +1336,7 @@ function atualizarBadgeTarefas(){
 }
 
 function renderTarefas(){
+  renderAlertaVencidas();
   const q=(document.getElementById('t-q')?.value||'').toLowerCase();
   const de=document.getElementById('t-de')?.value||'';
   const ate=document.getElementById('t-ate')?.value||'';
@@ -1125,9 +1379,22 @@ function tarefaCard(t){
   else if(vencida) cls+=' vencida';
   else if(eHoje) cls+=' hoje';
 
+  // Badge de status do cliente
+  const statusBadge=c?{
+    'CLIENTE ATIVO':`<span style="font-size:10px;font-weight:600;padding:1px 7px;border-radius:999px;background:#F0FDF4;color:#14532D">CLIENTE ATIVO</span>`,
+    'CLIENTE INATIVO':`<span style="font-size:10px;font-weight:600;padding:1px 7px;border-radius:999px;background:#F5F4F0;color:#6b6a62">CLIENTE INATIVO</span>`,
+    'LEADS':`<span style="font-size:10px;font-weight:600;padding:1px 7px;border-radius:999px;background:#EEF2FF;color:#3730A3">LEAD</span>`
+  }[c.status]||'' : '';
+
+  // Verificar se já tem negócio em andamento para este cliente/vendedor
+  const temDealAtivo=deals.some(d=>d.clienteId===t.clienteId&&d.vendedor===t.vendedor&&d.etapa!=='ganho'&&d.etapa!=='perdido');
+
   return `<div class="${cls}">
     ${deGerente?`<div class="task-gerente-label">⭐ Tarefa do gerente ${esc(t.criadoPor)}</div>`:''}
-    <div class="task-title">${esc(cn||'—')}</div>
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px">
+      <div class="task-title" style="margin-bottom:0">${esc(cn||'—')}</div>
+      ${statusBadge}
+    </div>
     <div class="task-meta">
       <span>📅 ${fmtDate(t.data)}</span>
       <span>👤 ${esc(t.vendedor)}</span>
@@ -1136,11 +1403,28 @@ function tarefaCard(t){
     ${t.obs?`<div class="task-obs">${esc(t.obs)}</div>`:''}
     <div class="task-actions">
       ${c?`<button class="btn-sm" style="color:#5B21B6;border-color:#DDD6FE;background:#F5F3FF" onclick="verDadosCliente('${c.id}')">👁 Dados do cliente</button>`:''}
+      ${c&&!temDealAtivo&&t.status==='andamento'?`<button class="btn-sm" style="color:var(--c-text);border-color:var(--c-border);background:var(--c-bg)" onclick="enviarParaFunil('${t.clienteId}','${t.vendedor}','${t.id}')">→ Funil</button>`:''}
+      ${c&&temDealAtivo&&t.status==='andamento'?`<button class="btn-sm" style="color:var(--c-text);border-color:var(--c-border);background:var(--c-bg)" onclick="verFunilCliente('${t.clienteId}')">Ver no funil</button>`:''}
       <button class="btn-sm" onclick="abrirTarefa('${t.id}')">Editar</button>
       ${t.status==='andamento'?`<button class="btn-sm" style="background:var(--g-bg);color:var(--g-text);border-color:var(--g-border)" onclick="finalizarTarefa('${t.id}')">Finalizar</button>`:''}
       ${CFG.role==='gestor'?`<button class="btn-sm" style="color:#881337" onclick="deletarTarefa('${t.id}')">Remover</button>`:''}
     </div>
   </div>`;
+}
+
+function enviarParaFunil(clienteId, vendedor, tarefaId){
+  // Abre modal de novo negócio já com cliente e vendedor pré-preenchidos
+  abrirDeal(null, clienteId, vendedor);
+}
+
+function verFunilCliente(clienteId){
+  // Navega para funil filtrando pelo cliente
+  const btn=document.querySelectorAll('.nav-btn')[0];
+  nav('funil', btn);
+  setTimeout(()=>{
+    const q=document.getElementById('kb-q');
+    if(q){ q.value=nomeCliente(clienteId); renderFunil(); }
+  },100);
 }
 
 function waIcon(num){
@@ -1158,11 +1442,14 @@ function verDadosClienteDeal(){
 
 function verDadosCliente(id){
   const c=clientes.find(x=>x.id===id); if(!c) return;
+  // Histórico de negócios do cliente
+  const negocios=deals.filter(d=>d.clienteId===id).sort((a,b)=>b.data.localeCompare(a.data));
   modal(`<h3>Dados do cliente</h3>
     <div class="form-grid">
       <div class="frow"><label>Razão Social</label><input value="${esc(c.razaoSocial||'')}" readonly></div>
       <div class="frow"><label>Nome Fantasia</label><input value="${esc(c.nomeFantasia||'')}" readonly></div>
       <div class="frow"><label>CNPJ / CPF</label><input value="${esc(c.cnpj||'')}" readonly></div>
+      <div class="frow"><label>Inscrição Estadual</label><input value="${esc(c.ie||'')}" readonly></div>
       <div class="frow"><label>WhatsApp</label>
         <div style="display:flex;align-items:center;gap:6px">
           <input value="${esc(c.whatsapp||'')}" readonly style="flex:1">
@@ -1181,7 +1468,31 @@ function verDadosCliente(id){
       <div class="frow"><label>Status</label><input value="${esc(c.status||'')}" readonly></div>
       <div class="frow"><label>Cód. Cliente</label><input value="${esc(c.codCliente||'')}" readonly></div>
       <div class="frow"><label>Vendedor</label><input value="${esc(c.vendedor||'—')}" readonly></div>
+      ${c.valorPotencial?`<div class="frow full"><label>Valor potencial médio</label><input value="${fmt(c.valorPotencial)}" readonly></div>`:''}
       <div class="frow full"><label>Observações</label><textarea readonly style="resize:none">${esc(c.obs||'')}</textarea></div>
+      ${c.obsHistorico&&c.obsHistorico.length?`<div class="frow full">
+        <label>Histórico de anotações (${c.obsHistorico.length})</label>
+        <div style="max-height:160px;overflow-y:auto">
+          ${c.obsHistorico.slice().reverse().map(h=>`<div class="obs-hist-item"><div class="obs-hist-meta">${h.data} · ${esc(h.autor)}</div><div class="obs-hist-text">${esc(h.texto)}</div></div>`).join('')}
+        </div>
+      </div>`:''}
+      ${negocios.length?`<div class="frow full">
+        <label>Histórico de negócios (${negocios.length})</label>
+        <div style="max-height:200px;overflow-y:auto">
+          ${negocios.map(d=>{
+            const corEtapa={contato:'var(--c-text)',orcamento:'var(--o-text)',ganho:'var(--g-text)',perdido:'var(--p-text)'};
+            const bgEtapa={contato:'var(--c-bg)',orcamento:'var(--o-bg)',ganho:'var(--g-bg)',perdido:'var(--p-bg)'};
+            return `<div class="hist-item" style="margin-bottom:5px">
+              <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:4px">
+                <span style="font-weight:600;font-size:11px;padding:2px 7px;border-radius:999px;background:${bgEtapa[d.etapa]||'var(--surface2)'};color:${corEtapa[d.etapa]||'var(--text2)'}">${ELABEL[d.etapa]||d.etapa}</span>
+                <span style="font-size:11px;font-family:var(--mono);font-weight:600">${fmt(d.valor)}</span>
+              </div>
+              <div class="hist-meta" style="margin-top:3px">${d.data} · ${esc(d.vendedor||'—')}${d.numOrcamento?' · Orç: '+esc(d.numOrcamento):''}</div>
+              ${d.motivo?`<div style="font-size:11px;color:var(--p-text);margin-top:2px">Motivo: ${esc(d.motivo)}</div>`:''}
+            </div>`;
+          }).join('')}
+        </div>
+      </div>`:''}
     </div>
     <div class="modal-actions">
       <button class="btn-outline" onclick="fecharModal()">Fechar</button>
@@ -1261,11 +1572,14 @@ function salvarTarefa(){
   if(editTarefaId){ const i=tarefas.findIndex(t=>t.id===editTarefaId); tarefas[i]={...tarefas[i],...obj}; }
   else tarefas.push({id:uid(),...obj});
   saveLocal(); syncRemote(); fecharModal(); renderTarefas(); atualizarBadgeTarefas();
+  registrarLog('tarefa', editTarefaId?'Tarefa editada':'Tarefa criada', `Cliente: ${nomeCliente(clienteId)}`);
 }
 
 function finalizarTarefa(id){
   const t=tarefas.find(x=>x.id===id); if(!t) return;
-  t.status='finalizada'; saveLocal(); renderTarefas(); atualizarBadgeTarefas();
+  t.status='finalizada';
+  registrarLog('tarefa','Tarefa finalizada',`Cliente: ${nomeCliente(t.clienteId)}`);
+  saveLocal(); renderTarefas(); atualizarBadgeTarefas();
   setTimeout(()=>abrirAgendamentoPosFinal(t.clienteId),400);
 }
 
@@ -1284,13 +1598,22 @@ function renderClientes(){
   const q=(document.getElementById('q-c')?.value||'').toLowerCase();
   const fs=document.getElementById('f-sc')?.value||'';
   const fnov=document.getElementById('f-novos')?.value||'';
+  const fcat=document.getElementById('f-cat')?.value||'';
   const de=document.getElementById('c-de')?.value||'';
   const ate=document.getElementById('c-ate')?.value||'';
+  // Popular categorias no filtro
+  const fCatEl=document.getElementById('f-cat');
+  if(fCatEl){
+    const cats=[...new Set(clientes.map(c=>c.categoria).filter(Boolean))].sort();
+    const cur=fCatEl.value;
+    fCatEl.innerHTML='<option value="">Todas as categorias</option>'+cats.map(c=>`<option ${c===cur?'selected':''}>${c}</option>`).join('');
+  }
   const lista=clientes.filter(c=>{
     if(!clienteVisivel(c)) return false;
     const txt=(c.razaoSocial+c.nomeFantasia+c.cnpj+c.email+c.contato).toLowerCase();
     if(!txt.includes(q)) return false;
     if(fs&&c.status!==fs) return false;
+    if(fcat&&c.categoria!==fcat) return false;
     if(fnov==='novos'&&(c.cadastradoPor==='sistema'||c.cadastradoPor==='importação'||!c.cadastradoPor)) return false;
     if(de&&c.dataVinculo&&c.dataVinculo<de) return false;
     if(ate&&c.dataVinculo&&c.dataVinculo>ate) return false;
@@ -1308,8 +1631,14 @@ function renderClientes(){
     const podeEditar=CFG.role!=='gerente';
     const temHist=deals.some(d=>d.clienteId===c.id);
     const statusCls=c.status==='CLIENTE ATIVO'?'ativo':c.status==='CLIENTE INATIVO'?'inativo':'lead';
-    return `<tr>
-      <td style="white-space:nowrap">
+    // Calcular dias desde último contato para alerta de vínculo
+    const diasSemContato=c.dataVinculo?Math.floor((new Date()-new Date(c.dataVinculo))/86400000):null;
+    const diasConfig=CONFIG.diasInativo||90;
+    const alertaVinculo=c.vendedor&&c.status==='CLIENTE ATIVO'&&diasSemContato!==null&&diasSemContato>=(diasConfig-15)&&diasSemContato<diasConfig;
+    const restantes=alertaVinculo?diasConfig-diasSemContato:null;
+    return `<tr${alertaVinculo?` style="background:#FFFBEB"`:''}>`+
+      `<td style="white-space:nowrap">
+        ${alertaVinculo?`<span title="⚠️ ${restantes} dias para perder vínculo" style="color:#D97706;font-size:13px;margin-right:3px;cursor:help">⚠️</span>`:''}
         ${CFG.role!=='gerente'?`<button class="btn-sm" style="color:var(--c-text);border-color:var(--c-border);background:var(--c-bg)" onclick="abrirDealParaCliente('${c.id}')">+ Negócio</button> `:''}
         ${CFG.role!=='gerente'?`<button class="btn-sm" style="color:#5B21B6;border-color:#DDD6FE;background:#F5F3FF" onclick="abrirTarefa(null,'${c.id}')">+ Tarefa</button> `:''}
         ${podeEditar?`<button class="btn-sm" onclick="abrirCliente('${c.id}')">Editar</button> `:''}
@@ -1317,7 +1646,7 @@ function renderClientes(){
         ${podeExcluir?`<button class="btn-sm" style="color:#881337" onclick="deletarCliente('${c.id}')">×</button>`:''}
       </td>
       <td style="font-family:var(--mono);font-size:11px;color:var(--text3)">${esc(c.codCliente||'—')}</td>
-      <td style="font-weight:600">${esc(c.razaoSocial||'—')}</td>
+      <td style="font-weight:600">${esc(c.razaoSocial||'—')}${c.categoria?`<span style="font-size:9px;font-weight:600;padding:1px 5px;border-radius:4px;background:var(--surface2);color:var(--text3);margin-left:4px">${esc(c.categoria)}</span>`:''}</td>
       <td>${esc(c.nomeFantasia||'—')}</td>
       <td style="font-size:11px;color:var(--text2)">${esc(c.cnpj||'—')}</td>
       <td>${esc(c.whatsapp||'—')}</td>
@@ -1325,7 +1654,8 @@ function renderClientes(){
       <td style="color:var(--text2);max-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(c.email||'')}">${esc(c.email||'—')}</td>
       <td>${esc(c.contato||'—')}</td>
       <td style="font-size:11px">${esc((c.cidade||'')+(c.estado?'/'+c.estado:''))}</td>
-      <td><span class="badge badge-${statusCls}">${c.status||'LEADS'}</span></td>
+      <td><span class="badge badge-${statusCls}">${c.status||'LEADS'}</span>${alertaVinculo?`<span style="font-size:9px;color:#D97706;display:block">⚠️ ${restantes}d p/ vencer</span>`:''}
+      </td>
       <td style="font-size:11px;color:var(--text3)">${esc(c.vendedor||'—')}</td>
     </tr>`;
   }).join('');
@@ -1345,6 +1675,7 @@ function abrirCliente(id=null){
       <div class="frow"><label>Razão Social *</label><input id="fc-rs" value="${esc(c.razaoSocial||'')}"></div>
       <div class="frow"><label>Nome Fantasia</label><input id="fc-nf" value="${esc(c.nomeFantasia||'')}"></div>
       <div class="frow"><label>CNPJ / CPF</label><input id="fc-cnpj" value="${esc(c.cnpj||'')}"></div>
+      <div class="frow"><label>Inscrição Estadual</label><input id="fc-ie" value="${esc(c.ie||'')}"></div>
       <div class="frow"><label>WhatsApp</label>
         <div style="display:flex;align-items:center;gap:6px">
           <input id="fc-wa" value="${esc(c.whatsapp||'')}" style="flex:1">
@@ -1364,6 +1695,12 @@ function abrirCliente(id=null){
         <label>Status</label>
         ${(CFG.role==='gestor'||CFG.role==='gerente')?`<select id="fc-status">${STATUS_CLIENTE.map(s=>`<option ${c.status===s?'selected':''}>${s}</option>`).join('')}</select>`:`<input id="fc-status" value="${esc(c.status||'LEADS')}" readonly style="background:var(--surface2);color:var(--text2)">`}
       </div>
+      <div class="frow"><label>Categoria</label>
+        <select id="fc-cat">
+          <option value="">— Selecione —</option>
+          ${(CONFIG.categorias||['REVENDEDOR','CONSUMIDOR FINAL','DISTRIBUIDOR','REPRESENTANTE']).map(cat=>`<option ${c.categoria===cat?'selected':''}>${cat}</option>`).join('')}
+        </select>
+      </div>
       <div class="frow">
         <label>Cód. Cliente ${codLocked?'<span style="font-size:9px;color:var(--g-text);background:var(--g-bg);padding:1px 5px;border-radius:4px">BLOQUEADO</span>':''}</label>
         <input id="fc-cod" value="${esc(c.codCliente||'')}" ${!id&&!isGestor?'disabled placeholder="PREENCHIDO NA VENDA EFETIVADA"':''} ${codLocked?'readonly':''}>
@@ -1372,7 +1709,20 @@ function abrirCliente(id=null){
         <label>Vendedor associado ${!podeEditarVendedor?'<span style="font-size:9px;color:var(--text3)">(somente gestor/gerente)</span>':''}</label>
         ${podeEditarVendedor?`<select id="fc-vend"><option value="">— sem vínculo —</option>${vOpts}</select>`:`<input id="fc-vend" value="${esc(c.vendedor||'—')}" readonly>`}
       </div>
-      <div class="frow full"><label>Observações</label><textarea id="fc-obs">${esc(c.obs||'')}</textarea></div>
+      <div class="frow full"><label>Observações (nova anotação)</label><textarea id="fc-obs" placeholder="ADICIONE UMA NOVA ANOTAÇÃO..."></textarea></div>
+      ${id&&c.obsHistorico&&c.obsHistorico.length?`<div class="frow full"><label>Histórico de anotações</label>
+        <div style="max-height:200px;overflow-y:auto">
+          ${c.obsHistorico.slice().reverse().map((h,revIdx)=>{
+            const origIdx=c.obsHistorico.length-1-revIdx;
+            return `<div class="obs-hist-item" style="display:flex;align-items:flex-start;gap:8px">
+              <div style="flex:1"><div class="obs-hist-meta">${h.data} · ${esc(h.autor)}</div><div class="obs-hist-text">${esc(h.texto)}</div></div>
+              ${CFG.role==='gestor'?`<button class="btn-sm" style="color:#881337;flex-shrink:0;padding:2px 6px;font-size:10px" onclick="excluirObs('${id}',${origIdx})">×</button>`:''}
+            </div>`;
+          }).join('')}
+        </div>
+      </div>`:''}
+      <div class="frow"><label>Valor potencial (R$) <span style="font-size:9px;color:var(--text3)">atualizado pela média de vendas</span></label>
+        <input id="fc-vpot" type="number" min="0" step="0.01" value="${c.valorPotencial||''}" ${CFG.role!=='gestor'?'readonly style="background:var(--surface2);color:var(--text2)"':''}></div>
     </div>
     <div class="modal-actions">
       <button class="btn-outline" onclick="fecharModal()">Cancelar</button>
@@ -1382,7 +1732,7 @@ function abrirCliente(id=null){
 
 function salvarCliente(){
   const rs=g('fc-rs').toUpperCase(); if(!rs){ alert('Informe a Razão Social.'); return; }
-  const nf=g('fc-nf').toUpperCase(); const cnpj=g('fc-cnpj').toUpperCase(); const email=g('fc-email').toUpperCase();
+  const nf=g('fc-nf').toUpperCase(); const cnpj=g('fc-cnpj').toUpperCase(); const ie=g('fc-ie').toUpperCase(); const email=g('fc-email').toUpperCase();
   const cod=g('fc-cod').toUpperCase(); const nomeFant=nf.toUpperCase();
 
   // Validações de duplicata
@@ -1434,26 +1784,37 @@ function salvarCliente(){
   let vendedorAssoc=g('fc-vend');
   if(!editClienteId||CFG.role==='vendedor') vendedorAssoc=editClienteId?clientes.find(c=>c.id===editClienteId)?.vendedor||'':'';
 
-  const obj={razaoSocial:rs,nomeFantasia:nf,cnpj,whatsapp:g('fc-wa').toUpperCase(),tel:g('fc-tel').toUpperCase(),tel2:g('fc-tel2').toUpperCase(),tel3:g('fc-tel3').toUpperCase(),email,email2:g('fc-email2').toUpperCase(),contato:g('fc-contato').toUpperCase(),cidade:g('fc-cidade').toUpperCase(),estado:g('fc-estado').toUpperCase(),transportadora:g('fc-transp').toUpperCase(),status:g('fc-status')||'LEADS',codCliente,obs:g('fc-obs').toUpperCase()};
+  const novaObs=g('fc-obs').toUpperCase();
+  const obj={razaoSocial:rs,nomeFantasia:nf,cnpj,ie,whatsapp:g('fc-wa').toUpperCase(),tel:g('fc-tel').toUpperCase(),tel2:g('fc-tel2').toUpperCase(),tel3:g('fc-tel3').toUpperCase(),email,email2:g('fc-email2').toUpperCase(),contato:g('fc-contato').toUpperCase(),cidade:g('fc-cidade').toUpperCase(),estado:g('fc-estado').toUpperCase(),transportadora:g('fc-transp').toUpperCase(),status:g('fc-status')||'LEADS',categoria:g('fc-cat'),codCliente,obs:novaObs};
+  if(CFG.role==='gestor') obj.valorPotencial=parseFloat(g('fc-vpot'))||0;
   if(editClienteId){
     const idx=clientes.findIndex(c=>c.id===editClienteId);
     clientes[idx]={...clientes[idx],...obj};
-    // Gestor e gerente podem alterar vendedor, incluindo remover vínculo (string vazia)
+    // Adicionar ao histórico de observações se houver nova anotação
+    if(novaObs){
+      if(!clientes[idx].obsHistorico) clientes[idx].obsHistorico=[];
+      clientes[idx].obsHistorico.push({data:hoje(),autor:CFG.nome,texto:novaObs});
+      clientes[idx].obs=novaObs; // mantém a mais recente no campo obs
+    }
     if(CFG.role==='gestor'||CFG.role==='gerente'){
-      clientes[idx].vendedor=vendedorAssoc; // aceita '' para remover vínculo
-      if(!vendedorAssoc) clientes[idx].dataVinculo=''; // limpa data se removeu vínculo
+      clientes[idx].vendedor=vendedorAssoc;
+      if(!vendedorAssoc) clientes[idx].dataVinculo='';
     }
   } else {
-    // Novo cliente sempre entra como LEADS independente do que foi digitado
-    clientes.push({id:uid(),...obj,status:'LEADS',vendedor:'',dataVinculo:'',cadastradoPor:CFG.nome,global:false,reativacoes:0});
+    const novoCliente={id:uid(),...obj,status:'LEADS',vendedor:'',dataVinculo:'',cadastradoPor:CFG.nome,global:false,reativacoes:0,obsHistorico:[],valorPotencial:0};
+    if(novaObs) novoCliente.obsHistorico=[{data:hoje(),autor:CFG.nome,texto:novaObs}];
+    clientes.push(novoCliente);
   }
   saveLocal(); syncRemote(); fecharModal(); renderClientes();
+  registrarLog('cliente', editClienteId?'Cliente editado':'Cliente criado', rs);
 }
 
 function deletarCliente(id){
   if(CFG.role!=='gestor'){ toast('Somente o gestor pode excluir.','err'); return; }
+  const cn=clientes.find(c=>c.id===id)?.razaoSocial||id;
   confirmar('Remover este cliente permanentemente?', ()=>{
     clientes=clientes.filter(c=>c.id!==id); saveLocal(); syncRemote(); renderClientes();
+    registrarLog('cliente','Cliente removido',cn);
     toast('Cliente removido.','ok');
   });
 }
@@ -1470,9 +1831,9 @@ function verHistCliente(id){
     }).sort((a,b)=>a.data.localeCompare(b.data));
     document.getElementById('hist-body').innerHTML=dd.length?dd.map(d=>`<div class="hist-item">
       <div class="hist-etapa">${ELABEL[d.etapa]||d.etapa} <span style="font-weight:400;color:var(--text2)">· ${fmt(d.valor)}</span></div>
-      <div class="hist-meta">${d.data} · ${esc(d.vendedor||'—')}</div>
+      <div class="hist-meta">${d.data} · <strong>${esc(d.vendedor||'—')}</strong></div>
       ${d.motivo?`<div style="margin-top:3px;font-size:11px;color:var(--p-text)">Motivo: ${esc(d.motivo)}</div>`:''}
-      ${(d.historico||[]).length>1?`<div style="margin-top:3px;font-size:11px;color:var(--text3)">${d.historico.map(h=>`${ELABEL[h.etapa]||h.etapa} (${h.data})`).join(' → ')}</div>`:''}
+      ${(d.historico||[]).length>1?`<div style="margin-top:5px;font-size:11px;color:var(--text3);background:var(--surface);border-radius:4px;padding:4px 7px">${d.historico.map(h=>`<span>${ELABEL[h.etapa]||h.etapa} <span style="color:var(--text3)">(${h.data}${h.autor?' · '+esc(h.autor):''})</span></span>`).join(' → ')}</div>`:''}
     </div>`).join(''):'<p style="color:var(--text3);font-size:13px;padding:8px 0">Sem movimentações no período.</p>';
   };
   modal(`<h3>Histórico — ${esc(c.nomeFantasia||c.razaoSocial)}</h3>
@@ -1828,7 +2189,7 @@ function confirmar(msg, onSim){
   window._confirmCb = onSim;
 }
 document.addEventListener('click',e=>{
-  if(e.target.id==='modal-overlay') fecharModal();
+  // Modal não fecha ao clicar fora — vendedor deve usar o botão Cancelar/Fechar
   // WhatsApp buttons
   const waBtn=e.target.closest('.wa-btn');
   if(waBtn){ e.stopPropagation(); const num=waBtn.getAttribute('data-wa'); if(num) window.location.href='whatsapp://send?phone='+num; }
@@ -1838,6 +2199,163 @@ document.addEventListener('click',e=>{
 });
 let _tt;
 function toast(msg,type=''){ const el=document.getElementById('toast'); el.textContent=msg; el.className='toast'+(type?' '+type:'')+' show'; clearTimeout(_tt); _tt=setTimeout(()=>el.classList.remove('show'),3500); }
+
+function excluirObs(clienteId, idx){
+  if(CFG.role!=='gestor') return;
+  confirmar('Remover esta anotação do histórico?', ()=>{
+    const c=clientes.find(x=>x.id===clienteId); if(!c||!c.obsHistorico) return;
+    c.obsHistorico.splice(idx,1);
+    saveLocal(); syncRemote(); fecharModal();
+    // Reabrir modal de edição para atualizar
+    abrirCliente(clienteId);
+    toast('Anotação removida.','ok');
+  });
+}
+
+// ══════════════════════════════════════════════════════════
+//  RELATÓRIO
+// ══════════════════════════════════════════════════════════
+function gerarRelatorio(){
+  const de=document.getElementById('rel-de')?.value||'';
+  const ate=document.getElementById('rel-ate')?.value||'';
+  const scopeDeals=deals.filter(d=>{
+    if(!dealVisivel(d)) return false;
+    if(de&&d.data<de) return false;
+    if(ate&&d.data>ate) return false;
+    return true;
+  });
+  // Agrupar por vendedor
+  const vmap={};
+  usuarios.filter(u=>u.role==='vendedor').forEach(u=>{ vmap[u.nome]={abertos:0,ganhos:0,perdidos:0,orcamentos:0,valorGanho:0,valorAberto:0,clientes:0}; });
+  scopeDeals.forEach(d=>{
+    if(!d.vendedor) return;
+    if(!vmap[d.vendedor]) vmap[d.vendedor]={abertos:0,ganhos:0,perdidos:0,orcamentos:0,valorGanho:0,valorAberto:0,clientes:0};
+    const s=vmap[d.vendedor];
+    if(d.etapa==='contato') s.abertos++;
+    else if(d.etapa==='orcamento'){ s.orcamentos++; s.valorAberto+=Number(d.valor||0); }
+    else if(d.etapa==='ganho'){ s.ganhos++; s.valorGanho+=Number(d.valor||0); }
+    else if(d.etapa==='perdido') s.perdidos++;
+  });
+  // Contar clientes cadastrados no período
+  clientes.filter(c=>{
+    if(!c.cadastradoPor||c.cadastradoPor==='sistema'||c.cadastradoPor==='importação') return false;
+    if(de&&c.dataVinculo&&c.dataVinculo<de) return false;
+    if(ate&&c.dataVinculo&&c.dataVinculo>ate) return false;
+    return true;
+  }).forEach(c=>{
+    const k=c.cadastradoPor;
+    if(vmap[k]) vmap[k].clientes++;
+    else vmap[k]={abertos:0,ganhos:0,perdidos:0,orcamentos:0,valorGanho:0,valorAberto:0,clientes:1};
+  });
+  const body=document.getElementById('relatorio-body');
+  if(!Object.keys(vmap).length){ body.innerHTML='<p style="color:var(--text3);font-size:13px">Nenhum dado no período.</p>'; return; }
+  const periodo=de&&ate?`${fmtDate(de)} a ${fmtDate(ate)}`:de?`A partir de ${fmtDate(de)}`:ate?`Até ${fmtDate(ate)}`:'Todo o período';
+  body.innerHTML=`<p style="font-size:12px;color:var(--text3);margin-bottom:1rem">Período: ${periodo}</p>`+
+  Object.entries(vmap).sort((a,b)=>b[1].valorGanho-a[1].valorGanho).map(([nome,s])=>{
+    const total=s.abertos+s.orcamentos+s.ganhos+s.perdidos;
+    const taxa=total>0?Math.round(s.ganhos/total*100):0;
+    const u=usuarios.find(x=>x.nome===nome); const meta=u?.meta||0;
+    const pct=meta>0?Math.min(100,Math.round(s.valorGanho/meta*100)):0;
+    return `<div class="relatorio-card">
+      <div class="relatorio-vendedor">${esc(nome)}</div>
+      <div class="relatorio-grid">
+        <div class="relatorio-stat"><div class="relatorio-stat-label">Clientes cadastrados</div><div class="relatorio-stat-val" style="color:var(--c-text)">${s.clientes}</div></div>
+        <div class="relatorio-stat"><div class="relatorio-stat-label">Contatos</div><div class="relatorio-stat-val">${s.abertos}</div></div>
+        <div class="relatorio-stat"><div class="relatorio-stat-label">Orçamentos</div><div class="relatorio-stat-val">${s.orcamentos}</div></div>
+        <div class="relatorio-stat"><div class="relatorio-stat-label">Ganhos</div><div class="relatorio-stat-val" style="color:var(--g-text)">${s.ganhos}</div></div>
+        <div class="relatorio-stat"><div class="relatorio-stat-label">Perdidos</div><div class="relatorio-stat-val" style="color:var(--p-text)">${s.perdidos}</div></div>
+        <div class="relatorio-stat"><div class="relatorio-stat-label">Conversão</div><div class="relatorio-stat-val">${taxa}%</div></div>
+        <div class="relatorio-stat"><div class="relatorio-stat-label">Valor ganho</div><div class="relatorio-stat-val" style="font-size:13px;font-family:var(--mono)">${fmt(s.valorGanho)}</div></div>
+        <div class="relatorio-stat"><div class="relatorio-stat-label">Em aberto</div><div class="relatorio-stat-val" style="font-size:13px;font-family:var(--mono)">${fmt(s.valorAberto)}</div></div>
+        ${meta>0?`<div class="relatorio-stat" style="grid-column:1/-1"><div class="relatorio-stat-label">Meta: ${fmt(meta)} — ${pct}%</div><div style="background:var(--surface3);border-radius:3px;height:6px;margin-top:4px"><div style="background:${pct>=100?'var(--g-dot)':pct>=60?'var(--o-dot)':'var(--p-dot)'};height:6px;border-radius:3px;width:${pct}%"></div></div></div>`:''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function exportarRelatorioExcel(){
+  const de=document.getElementById('rel-de')?.value||'';
+  const ate=document.getElementById('rel-ate')?.value||'';
+  const scopeDeals=deals.filter(d=>{
+    if(!dealVisivel(d)) return false;
+    if(de&&d.data<de) return false;
+    if(ate&&d.data>ate) return false;
+    return true;
+  });
+  const vmap={};
+  usuarios.filter(u=>u.role==='vendedor').forEach(u=>{ vmap[u.nome]={abertos:0,ganhos:0,perdidos:0,orcamentos:0,valorGanho:0,valorAberto:0,meta:u.meta||0,clientes:0}; });
+  scopeDeals.forEach(d=>{
+    if(!d.vendedor||!vmap[d.vendedor]) return;
+    const s=vmap[d.vendedor];
+    if(d.etapa==='contato') s.abertos++;
+    else if(d.etapa==='orcamento'){ s.orcamentos++; s.valorAberto+=Number(d.valor||0); }
+    else if(d.etapa==='ganho'){ s.ganhos++; s.valorGanho+=Number(d.valor||0); }
+    else if(d.etapa==='perdido') s.perdidos++;
+  });
+  clientes.filter(c=>{
+    if(!c.cadastradoPor||c.cadastradoPor==='sistema'||c.cadastradoPor==='importação') return false;
+    if(de&&c.dataVinculo&&c.dataVinculo<de) return false;
+    if(ate&&c.dataVinculo&&c.dataVinculo>ate) return false;
+    return true;
+  }).forEach(c=>{ const k=c.cadastradoPor; if(vmap[k]) vmap[k].clientes++; });
+  const data=Object.entries(vmap).map(([nome,s])=>{
+    const total=s.abertos+s.orcamentos+s.ganhos+s.perdidos;
+    return {'Vendedor':nome,'Clientes cadastrados':s.clientes,'Contatos':s.abertos,'Orçamentos':s.orcamentos,'Ganhos':s.ganhos,'Perdidos':s.perdidos,'Total negócios':total,'Taxa conversão (%)':total>0?Math.round(s.ganhos/total*100):0,'Valor ganho':s.valorGanho,'Valor em aberto':s.valorAberto,'Meta':s.meta,'% da meta':s.meta>0?Math.round(s.valorGanho/s.meta*100):0};
+  });
+  if(!data.length){ toast('Nenhum dado para exportar.','warn'); return; }
+  xlsxExport(data,'relatorio_vendedores');
+}
+
+// ══════════════════════════════════════════════════════════
+//  LOG DE ATIVIDADES
+// ══════════════════════════════════════════════════════════
+function registrarLog(tipo, acao, detalhe=''){
+  if(!CFG.nome) return;
+  log_.push({
+    ts:new Date().toISOString(),
+    usuario:CFG.nome,
+    tipo,
+    acao,
+    detalhe:String(detalhe).substring(0,120)
+  });
+  if(log_.length>500) log_=log_.slice(-500);
+}
+
+function renderLog(){
+  const de=document.getElementById('log-de')?.value||'';
+  const ate=document.getElementById('log-ate')?.value||'';
+  const fu=document.getElementById('log-user')?.value||'';
+  const ft=document.getElementById('log-tipo')?.value||'';
+  // Popular filtro de usuários
+  const sel=document.getElementById('log-user');
+  if(sel){
+    const cur=sel.value;
+    const nomes=[...new Set(log_.map(l=>l.usuario))].sort();
+    sel.innerHTML='<option value="">Todos os usuários</option>'+nomes.map(n=>`<option ${n===cur?'selected':''}>${n}</option>`).join('');
+  }
+  const lista=log_.filter(l=>{
+    const d=l.ts.slice(0,10);
+    if(de&&d<de) return false;
+    if(ate&&d>ate) return false;
+    if(fu&&l.usuario!==fu) return false;
+    if(ft&&l.tipo!==ft) return false;
+    return true;
+  }).slice().reverse();
+  const tb=document.getElementById('tbody-log'); if(!tb) return;
+  if(!lista.length){ tb.innerHTML=`<tr><td colspan="5" class="empty-td">Nenhuma atividade registrada</td></tr>`; return; }
+  const tipoColor={login:'var(--c-text)',cliente:'var(--g-text)',deal:'var(--o-text)',tarefa:'#5B21B6'};
+  tb.innerHTML=lista.map(l=>{
+    const dt=new Date(l.ts);
+    const dtStr=`${dt.toLocaleDateString('pt-BR')} ${dt.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}`;
+    return `<tr>
+      <td style="font-size:11px;color:var(--text3);white-space:nowrap">${dtStr}</td>
+      <td style="font-weight:500">${esc(l.usuario)}</td>
+      <td><span style="font-size:10px;font-weight:600;padding:2px 7px;border-radius:999px;background:var(--surface2);color:${tipoColor[l.tipo]||'var(--text2)'}">${l.tipo.toUpperCase()}</span></td>
+      <td style="font-size:12px">${esc(l.acao)}</td>
+      <td style="font-size:11px;color:var(--text2)">${esc(l.detalhe)}</td>
+    </tr>`;
+  }).join('');
+}
 
 // ══════════════════════════════════════════════════════════
 //  DASHBOARD HELPERS
@@ -1854,7 +2372,7 @@ function verClientesDash(vendedor){
 // ══════════════════════════════════════════════════════════
 //  CONFIGURAÇÕES
 // ══════════════════════════════════════════════════════════
-let CONFIG={diasInativo:90,diasVinculo:90,funcoes:['Vendedor','Vendedora','Gerente de Vendas','Gestor','Supervisor']};
+let CONFIG={diasInativo:90,diasVinculo:90,funcoes:['Vendedor','Vendedora','Gerente de Vendas','Gestor','Supervisor'],categorias:['REVENDEDOR','CONSUMIDOR FINAL','DISTRIBUIDOR','REPRESENTANTE']};
 
 function carregarConfig(){
   const s=localStorage.getItem('crm7_config');
@@ -1879,6 +2397,23 @@ function renderConfig(){
     <span style="flex:1;font-size:12px;padding:5px 8px;background:var(--surface2);border-radius:var(--radius)">${esc(f)}</span>
     <button class="btn-sm" style="font-size:10px;padding:3px 7px;color:#881337" onclick="removerFuncao(${i})">×</button>
   </div>`).join('');
+  const lista2=document.getElementById('cfg-cat-lista'); if(!lista2) return;
+  lista2.innerHTML=(CONFIG.categorias||[]).map((f,i)=>`<div style="display:flex;align-items:center;gap:6px;margin-bottom:5px">
+    <span style="flex:1;font-size:12px;padding:5px 8px;background:var(--surface2);border-radius:var(--radius)">${esc(f)}</span>
+    <button class="btn-sm" style="font-size:10px;padding:3px 7px;color:#881337" onclick="removerCategoria(${i})">×</button>
+  </div>`).join('');
+}
+
+function adicionarCategoria(){
+  const inp=document.getElementById('cfg-nova-cat'); if(!inp||!inp.value.trim()) return;
+  if(!CONFIG.categorias) CONFIG.categorias=[];
+  CONFIG.categorias.push(inp.value.trim().toUpperCase()); inp.value='';
+  localStorage.setItem('crm7_config',JSON.stringify(CONFIG)); renderConfig();
+}
+
+function removerCategoria(i){
+  CONFIG.categorias.splice(i,1);
+  localStorage.setItem('crm7_config',JSON.stringify(CONFIG)); renderConfig();
 }
 
 function adicionarFuncao(){
@@ -1953,6 +2488,7 @@ function carregarFirebase(){
   clientes=JSON.parse(localStorage.getItem('crm6_clientes')||'[]');
   vendedores=JSON.parse(localStorage.getItem('crm6_vendors')||'[]');
   tarefas=JSON.parse(localStorage.getItem('crm6_tarefas')||'[]');
+  log_=JSON.parse(localStorage.getItem('crm6_log')||'[]');
   if(!usuarios.length) seedUsuarios();
   await carregarFirebase();
   const sess=localStorage.getItem('crm6_session');
