@@ -268,7 +268,7 @@ tbody tr:hover td{background:var(--surface2);}
 <!-- LOGIN -->
 <div id="login-screen">
   <div class="login-card">
-    <div class="login-logo">CRM <span style="font-size:12px;font-weight:400;color:var(--text3)">v15.2</span></div>
+    <div class="login-logo">CRM <span style="font-size:12px;font-weight:400;color:var(--text3)">v15.3</span></div>
     <div class="login-sub">Acesse sua conta</div>
     <label>Usuário</label>
     <input id="lg-user" placeholder="Seu nome" style="text-transform:none" oninput="this.value=this.value.replace(/[^a-zA-Z\s]/g,'')">
@@ -283,7 +283,7 @@ tbody tr:hover td{background:var(--surface2);}
 <div id="app">
   <div class="topbar">
     <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-      <span class="topbar-logo">CRM <span style="font-size:10px;font-weight:400;color:var(--text3)">v15.2</span></span>
+      <span class="topbar-logo">CRM <span style="font-size:10px;font-weight:400;color:var(--text3)">v15.3</span></span>
       <nav class="nav">
         <button class="nav-btn active" onclick="nav('funil',this)">Funil</button>
         <button class="nav-btn" onclick="nav('tarefas',this)" id="btn-nav-tarefas">Tarefas<span class="nav-badge" id="badge-tarefas" style="display:none">0</span></button>
@@ -422,8 +422,8 @@ tbody tr:hover td{background:var(--surface2);}
         <div class="rank-row" style="background:var(--surface2)">
           <span style="font-size:9px;font-weight:700;color:var(--text3)">#</span>
           <span style="font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.05em">Vendedor</span>
-          <span style="font-size:9px;font-weight:700;color:var(--text3)">Negócios</span>
-          <span style="font-size:9px;font-weight:700;color:var(--text3)">Ganhos</span>
+          <span style="font-size:9px;font-weight:700;color:var(--text3)">Vendas</span>
+          <span style="font-size:9px;font-weight:700;color:var(--text3)">Cadastros</span>
           <span style="font-size:9px;font-weight:700;color:var(--text3)">Reat.</span>
           <span style="font-size:9px;font-weight:700;color:var(--text3)">Valor ganho</span>
           <span style="font-size:9px;font-weight:700;color:var(--text3)">Meta</span>
@@ -992,7 +992,8 @@ function onDrop(e,etapa){
   if(!d||d.etapa===etapa) return;
   if(d.etapa==='ganho'||d.etapa==='perdido'){ toast('Negócio finalizado não pode ser movido. Abra novo negócio.','warn'); return; }
   if(etapa==='perdido'){ pedirMotivoPerda(d); return; }
-  if(etapa==='orcamento'||etapa==='ganho'){ pedirNumOrcamento(d, etapa); return; }
+  if(etapa==='ganho'){ pedirNumOrcamento(d, etapa); return; }
+  if(etapa==='orcamento'){ moverEtapa(d,'orcamento'); return; }
   moverEtapa(d,etapa);
 }
 
@@ -1063,7 +1064,7 @@ function avancar(id){
     moverParaGanho(d); return; 
   }
   if(destino==='orcamento'){
-    pedirNumOrcamento(d,'orcamento'); return;
+    moverEtapa(d,'orcamento'); return;
   }
   moverEtapa(d,destino);
 }
@@ -1293,7 +1294,7 @@ function salvarDeal(){
   }
 
   const numOrcamento=g('fd-num-orc').toUpperCase();
-  if((etapa==='orcamento'||etapa==='ganho')&&!numOrcamento){ toast('Informe o número do orçamento.','err'); return; }
+  if(etapa==='ganho'&&!numOrcamento){ toast('Informe o número do orçamento para Venda Efetivada.','err'); return; }
   const obj={clienteId,valor:parseFloat(g('fd-valor'))||0,vendedor:g('fd-vend'),data:g('fd-data')||hoje(),etapa,motivo,obs:g('fd-obs').toUpperCase(),numOrcamento};
   if(editDealId){
     const idx=deals.findIndex(d=>d.id===editDealId);
@@ -1389,12 +1390,11 @@ function renderTarefas(){
     if(CFG.role==='gerente'&&!meuGrupo().includes(t.vendedor)&&t.criadoPor!==CFG.nome) return false;
     if(fv&&t.vendedor!==fv) return false;
     if(fs&&t.status!==fs) return false;
-    // Em andamento: sempre aparece independente de data
-    // Finalizada: respeita filtro de data
-    if(t.status==='finalizada'){
-      if(de&&t.data<de) return false;
-      if(ate&&t.data>ate) return false;
-    }
+    // Tarefas em andamento: só ignoram filtro de data se nenhuma data foi selecionada
+    // Se o usuário selecionou um período, respeita para todos os status
+    if(t.status==='andamento'&&!de&&!ate) return true; // sem filtro: sempre aparece
+    if(de&&t.data<de) return false;
+    if(ate&&t.data>ate) return false;
     const cn=nomeCliente(t.clienteId).toLowerCase();
     if(q&&!cn.includes(q)) return false;
     return true;
@@ -1930,28 +1930,33 @@ function renderDashboard(){
   });
   scopeRank.forEach(d=>{
     if(!d.vendedor) return;
-    if(!vmap[d.vendedor]) vmap[d.vendedor]={n:0,g:0,val:0,reat:0};
-    vmap[d.vendedor].n++;
-    if(d.etapa==='ganho'){ vmap[d.vendedor].g++; vmap[d.vendedor].val+=Number(d.valor||0); }
+    if(!vmap[d.vendedor]) vmap[d.vendedor]={vendas:0,cadastros:0,val:0,reat:0};
+    if(d.etapa==='ganho'){ vmap[d.vendedor].vendas++; vmap[d.vendedor].val+=Number(d.valor||0); }
   });
   // Garantir que todos os vendedores aparecem mesmo sem negócios
   const todosVends=usuarios.filter(u=>u.role==='vendedor'||(CFG.role==='gestor'&&u.role==='gerente'));
-  todosVends.forEach(u=>{ if(!vmap[u.nome]) vmap[u.nome]={n:0,g:0,val:0,reat:0}; });
+  todosVends.forEach(u=>{ if(!vmap[u.nome]) vmap[u.nome]={vendas:0,cadastros:0,val:0,reat:0}; });
+  // Cadastros = novos clientes cadastrados pelo vendedor no período
+  clientes.filter(c=>{
+    if(!c.cadastradoPor||c.cadastradoPor==='sistema'||c.cadastradoPor==='importação') return false;
+    if(de&&c.dataVinculo&&c.dataVinculo<de) return false;
+    if(ate&&c.dataVinculo&&c.dataVinculo>ate) return false;
+    return true;
+  }).forEach(c=>{ if(vmap[c.cadastradoPor]) vmap[c.cadastradoPor].cadastros++; });
   clientes.forEach(c=>{ if(c.reativacoes>0&&c.vendedor&&vmap[c.vendedor]) vmap[c.vendedor].reat+=c.reativacoes||0; });
-  const rank=Object.entries(vmap).sort((a,b)=>b[1].g-a[1].g||b[1].n-a[1].n);
-  const maxG=rank[0]?.[1]?.g||1;
+  const rank=Object.entries(vmap).sort((a,b)=>b[1].vendas-a[1].vendas||b[1].cadastros-a[1].cadastros);
+  const maxV=rank[0]?.[1]?.vendas||1;
   document.getElementById('ranking-body').innerHTML=rank.length?rank.map(([nome,s],i)=>{
     const u=usuarios.find(x=>x.nome===nome); const meta=u?.meta||0;
     const pct=meta>0?Math.min(100,Math.round(s.val/meta*100)):0;
     const isMe=nome===CFG.nome;
     const podeVerValor=CFG.role==='gestor'||CFG.role==='gerente'||isMe;
-    // Vendedores veem negócios, ganhos e reat. de todos - só valor e meta ficam ocultos
     return `<div class="rank-row" style="${isMe?'background:var(--c-bg);':''}">
       <span style="font-size:11px;font-weight:700;color:var(--text3)">${i+1}</span>
-      <div><div style="font-weight:600;font-size:12px">${esc(nome)}${isMe?' ← você':''}</div><div class="rank-bar-wrap"><div class="rank-bar" style="width:${Math.round(s.g/maxG*100)}%"></div></div></div>
-      <span style="color:var(--text2)">${s.n}</span>
-      <span style="font-weight:600;color:var(--g-text)">${s.g}</span>
-      <span style="font-weight:600;color:var(--c-text)">${s.reat}</span>
+      <div><div style="font-weight:600;font-size:12px">${esc(nome)}${isMe?' ← você':''}</div><div class="rank-bar-wrap"><div class="rank-bar" style="width:${Math.round(s.vendas/maxV*100)}%"></div></div></div>
+      <span style="font-weight:600;color:var(--g-text)">${s.vendas}</span>
+      <span style="font-weight:600;color:var(--c-text)">${s.cadastros}</span>
+      <span style="font-weight:600;color:#7C3AED">${s.reat}</span>
       <span style="font-weight:600;font-family:var(--mono);font-size:11px">${podeVerValor?fmt(s.val):'••••••'}</span>
       <div>${podeVerValor&&meta>0?`<div class="meta-pct">${pct}%</div><div class="meta-bar-wrap"><div class="meta-bar" style="width:${pct}%;background:${pct>=100?'var(--g-dot)':pct>=60?'var(--o-dot)':'var(--p-dot)'}"></div></div>`:podeVerValor?'<span style="font-size:11px;color:var(--text3)">Sem meta</span>':'<span style="font-size:11px;color:var(--text3)">••••</span>'}</div>
     </div>`;
