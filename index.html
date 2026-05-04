@@ -660,8 +660,8 @@ function iniciarApp(){
     document.getElementById('btn-nav-relatorio').style.display='';
   }
   if(CFG.role==='gerente') document.getElementById('btn-nav-relatorio').style.display='';
-  checar90dias(); checarClientesInativos();
   carregarConfig();
+  checar90dias(); checarClientesInativos();
   const ini=mesCorrienteInicio(), fim=mesCorrienteFim();
   ['kb-de','kb-ate','t-de','t-ate','dash-de','dash-ate','c-de','c-ate','rel-de','rel-ate','log-de','log-ate'].forEach(id=>{
     const el=document.getElementById(id); if(el){ el.value=id.endsWith('-de')||id==='dash-de'?ini:fim; }
@@ -763,6 +763,28 @@ async function syncManual(){
 }
 
 // ══════════════════════════════════════════════════════════
+//  MÁSCARA DE MOEDA
+// ══════════════════════════════════════════════════════════
+function mascaraMoeda(input){
+  let v=input.value.replace(/\D/g,'');
+  if(!v){ input.value=''; return; }
+  v=(parseInt(v,10)/100).toFixed(2);
+  input.value=Number(v).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+}
+
+function parseMoeda(str){
+  if(!str) return 0;
+  // Aceita tanto "1.234,56" quanto "1234.56"
+  const limpo=String(str).replace(/\./g,'').replace(',','.');
+  return parseFloat(limpo)||0;
+}
+
+function moedaInput(valor){
+  if(!valor&&valor!==0) return '';
+  return Number(valor).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+}
+
+// ══════════════════════════════════════════════════════════
 //  FIREBASE SYNC
 // ══════════════════════════════════════════════════════════
 async function syncRemote(){
@@ -838,22 +860,24 @@ function seedDemoData(){
 // ══════════════════════════════════════════════════════════
 function checar90dias(){
   const agora=new Date();
+  const diasVinculo=CONFIG.diasVinculo||90;
   clientes.forEach(c=>{
     if(!c.vendedor||!c.dataVinculo) return;
     const dias=(agora-new Date(c.dataVinculo))/86400000;
-    if(dias>90){
+    if(dias>diasVinculo){
       const ultima=deals.filter(d=>d.clienteId===c.id&&d.etapa==='ganho').map(d=>new Date(d.data)).sort((a,b)=>b-a)[0];
-      if(!ultima||(agora-ultima)/86400000>90){ c.vendedor=''; c.dataVinculo=''; }
+      if(!ultima||(agora-ultima)/86400000>diasVinculo){ c.vendedor=''; c.dataVinculo=''; }
     }
   });
 }
 
 function checarClientesInativos(){
   const agora=new Date();
+  const diasInativo=CONFIG.diasInativo||90;
   clientes.forEach(c=>{
     if(c.status!=='CLIENTE ATIVO') return;
     const ultima=deals.filter(d=>d.clienteId===c.id&&d.etapa==='ganho').map(d=>new Date(d.data)).sort((a,b)=>b-a)[0];
-    if(!ultima||(agora-ultima)/86400000>90) c.status='CLIENTE INATIVO';
+    if(!ultima||(agora-ultima)/86400000>diasInativo) c.status='CLIENTE INATIVO';
   });
   saveLocal();
 }
@@ -1101,14 +1125,7 @@ function _finalizarGanho(d){
   vincularVendedor(d);
   if(eraInativo){ cAntes.status='CLIENTE ATIVO'; cAntes.reativacoes=(cAntes.reativacoes||0)+1; }
   else if(cAntes) cAntes.status='CLIENTE ATIVO';
-  // Atualizar valor potencial com média das vendas efetivadas
-  if(cAntes){
-    const vendasCliente=deals.filter(dl=>dl.clienteId===cAntes.id&&dl.etapa==='ganho'&&Number(dl.valor)>0);
-    if(vendasCliente.length>0){
-      const media=vendasCliente.reduce((a,dl)=>a+Number(dl.valor),0)/vendasCliente.length;
-      cAntes.valorPotencial=Math.round(media*100)/100;
-    }
-  }
+  atualizarValorPotencial(d.clienteId);
   moverEtapa(d,'ganho');
   setTimeout(()=>abrirAgendamentoPosFinal(d.clienteId),400);
 }
@@ -1245,7 +1262,7 @@ function abrirDeal(id=null, preClienteId=null, preVendedor=null){
           ${clienteIdInicial?`<button type="button" class="btn-sm" style="margin-top:6px;color:#5B21B6;border-color:#DDD6FE;background:#F5F3FF;font-size:11px" onclick="verDadosCliente(document.getElementById('fd-clienteId').value)">👁 Ver dados do cliente</button>`:''}
         </div>
       </div>
-      <div class="frow"><label>Valor (R$)</label><input id="fd-valor" type="number" min="0" step="0.01" value="${d.valor||''}"></div>
+      <div class="frow"><label>Valor (R$)</label><input id="fd-valor" type="text" inputmode="numeric" value="${moedaInput(d.valor)}" oninput="mascaraMoeda(this)" placeholder="0,00" style="text-transform:none"></div>
       <div class="frow"><label>Nº do Orçamento ${(etapaAtual==='orcamento'||etapaAtual==='ganho')?'<span style="color:var(--p-text);font-size:9px">*obrigatório</span>':''}</label><input id="fd-num-orc" value="${esc(d.numOrcamento||'')}" placeholder="EX: ORC-2024-001"></div>
       <div class="frow"><label>Vendedor responsável</label>
         ${CFG.role==='vendedor'?`<input id="fd-vend" value="${esc(CFG.nome)}" readonly>`:`<select id="fd-vend"><option value="">— selecione —</option>${vOpts}</select>`}
@@ -1283,7 +1300,7 @@ function salvarDeal(){
   const clienteId=document.getElementById('fd-clienteId').value;
   if(!clienteId){ toast('Selecione um cliente.','err'); return; }
   const etapa=g('fd-etapa'); const motivo=g('fd-motivo').toUpperCase();
-  if(etapa==='perdido'&&!motivo){ alert('Informe o motivo da perda.'); return; }
+  if(etapa==='perdido'&&!motivo){ toast('Informe o motivo da perda.','err'); return; }
 
   // Bloquear mudança de etapa de finalizado para não-gestor
   if(editDealId&&CFG.role!=='gestor'){
@@ -1295,7 +1312,7 @@ function salvarDeal(){
 
   const numOrcamento=g('fd-num-orc').toUpperCase();
   if(etapa==='ganho'&&!numOrcamento){ toast('Informe o número do orçamento para Venda Efetivada.','err'); return; }
-  const obj={clienteId,valor:parseFloat(g('fd-valor'))||0,vendedor:g('fd-vend'),data:g('fd-data')||hoje(),etapa,motivo,obs:g('fd-obs').toUpperCase(),numOrcamento};
+  const obj={clienteId,valor:parseMoeda(g('fd-valor')),vendedor:g('fd-vend'),data:g('fd-data')||hoje(),etapa,motivo,obs:g('fd-obs').toUpperCase(),numOrcamento};
   if(editDealId){
     const idx=deals.findIndex(d=>d.id===editDealId);
     const hist=deals[idx].historico||[];
@@ -1322,9 +1339,45 @@ function salvarDeal(){
 
 function _finalizarGanhoSilencioso(d){
   const c=clientes.find(x=>x.id===d.clienteId); if(!c) return;
+  // Verificar código do cliente — obrigatório para venda efetivada
+  if(!c.codCliente||!c.codCliente.trim()){
+    // Cod não preenchido — pedir antes de finalizar
+    setTimeout(()=>{
+      modal(`<h3>Código do cliente obrigatório</h3>
+        <p style="font-size:13px;color:var(--text2);margin-bottom:1rem">O cliente <strong>${esc(c.razaoSocial)}</strong> precisa de Código de Cliente para Venda Efetivada.</p>
+        <div class="frow" style="margin-bottom:1rem"><label>Código do cliente *</label><input id="inp-cod-sil" placeholder="EX: 00123" autofocus style="text-transform:uppercase"></div>
+        <div class="modal-actions">
+          <button class="btn-outline" onclick="fecharModal()">Cancelar</button>
+          <button class="btn-primary" onclick="confirmarCodSilencioso('${c.id}','${d.id}')">Confirmar</button>
+        </div>`);
+    },300);
+    return;
+  }
   if(c.status==='CLIENTE INATIVO'){ c.status='CLIENTE ATIVO'; c.reativacoes=(c.reativacoes||0)+1; }
   else c.status='CLIENTE ATIVO';
   vincularVendedor(d);
+  atualizarValorPotencial(c.id);
+}
+
+function confirmarCodSilencioso(clienteId, dealId){
+  const cod=document.getElementById('inp-cod-sil').value.trim().toUpperCase();
+  if(!cod){ toast('Informe o código.','err'); return; }
+  const c=clientes.find(x=>x.id===clienteId);
+  const d=deals.find(x=>x.id===dealId);
+  if(c) c.codCliente=cod;
+  fecharModal();
+  if(c.status==='CLIENTE INATIVO'){ c.status='CLIENTE ATIVO'; c.reativacoes=(c.reativacoes||0)+1; }
+  else c.status='CLIENTE ATIVO';
+  if(d) vincularVendedor(d);
+  atualizarValorPotencial(clienteId);
+  saveLocal(); syncRemote();
+  setTimeout(()=>abrirAgendamentoPosFinal(clienteId),300);
+}
+
+function atualizarValorPotencial(clienteId){
+  const c=clientes.find(x=>x.id===clienteId); if(!c) return;
+  const vendas=deals.filter(d=>d.clienteId===clienteId&&d.etapa==='ganho'&&Number(d.valor)>0);
+  if(vendas.length>0) c.valorPotencial=Math.round(vendas.reduce((a,d)=>a+Number(d.valor),0)/vendas.length*100)/100;
 }
 
 // ══════════════════════════════════════════════════════════
@@ -1603,7 +1656,7 @@ function salvarTarefa(){
       const obj={clienteId,data,vendedor:vend,obs:g('ft-obs').toUpperCase(),status:'finalizada'};
       const idx=tarefas.findIndex(t=>t.id===editTarefaId);
       tarefas[idx]={...tarefas[idx],...obj};
-      saveLocal(); fecharModal(); renderTarefas(); atualizarBadgeTarefas();
+      saveLocal(); syncRemote(); fecharModal(); renderTarefas(); atualizarBadgeTarefas();
       setTimeout(()=>abrirAgendamentoPosFinal(clienteId),400);
       return;
     }
@@ -1620,7 +1673,7 @@ function finalizarTarefa(id){
   const t=tarefas.find(x=>x.id===id); if(!t) return;
   t.status='finalizada';
   registrarLog('tarefa','Tarefa finalizada',`Cliente: ${nomeCliente(t.clienteId)}`);
-  saveLocal(); renderTarefas(); atualizarBadgeTarefas();
+  saveLocal(); syncRemote(); renderTarefas(); atualizarBadgeTarefas();
   setTimeout(()=>abrirAgendamentoPosFinal(t.clienteId),400);
 }
 
@@ -1763,7 +1816,7 @@ function abrirCliente(id=null){
         </div>
       </div>`:''}
       <div class="frow"><label>Valor potencial (R$) <span style="font-size:9px;color:var(--text3)">atualizado pela média de vendas</span></label>
-        <input id="fc-vpot" type="number" min="0" step="0.01" value="${c.valorPotencial||''}" ${CFG.role!=='gestor'?'readonly style="background:var(--surface2);color:var(--text2)"':''}></div>
+        <input id="fc-vpot" type="text" inputmode="numeric" value="${moedaInput(c.valorPotencial)}" oninput="mascaraMoeda(this)" placeholder="0,00" style="text-transform:none" ${CFG.role!=='gestor'?'readonly style="background:var(--surface2);color:var(--text2)"':''}></div>
     </div>
     <div class="modal-actions">
       <button class="btn-outline" onclick="fecharModal()">Cancelar</button>
@@ -1827,7 +1880,7 @@ function salvarCliente(){
 
   const novaObs=g('fc-obs').toUpperCase();
   const obj={razaoSocial:rs,nomeFantasia:nf,cnpj,ie,whatsapp:g('fc-wa').toUpperCase(),tel:g('fc-tel').toUpperCase(),tel2:g('fc-tel2').toUpperCase(),tel3:g('fc-tel3').toUpperCase(),email,email2:g('fc-email2').toUpperCase(),contato:g('fc-contato').toUpperCase(),cidade:g('fc-cidade').toUpperCase(),estado:g('fc-estado').toUpperCase(),transportadora:g('fc-transp').toUpperCase(),status:g('fc-status')||'LEADS',categoria:g('fc-cat'),codCliente,obs:novaObs};
-  if(CFG.role==='gestor') obj.valorPotencial=parseFloat(g('fc-vpot'))||0;
+  if(CFG.role==='gestor') obj.valorPotencial=parseMoeda(g('fc-vpot'));
   if(editClienteId){
     const idx=clientes.findIndex(c=>c.id===editClienteId);
     clientes[idx]={...clientes[idx],...obj};
@@ -2065,7 +2118,7 @@ function abrirVendedor(nome=null){
         </select>
       </div>
       <div class="frow"><label>E-mail</label><input id="fv-email" type="email" value="${esc(v.email||'')}" style="text-transform:none"></div>
-      <div class="frow"><label>Meta de faturamento (R$)</label><input id="fv-meta" type="number" min="0" step="100" value="${v.meta||0}"></div>
+      <div class="frow"><label>Meta de faturamento (R$)</label><input id="fv-meta" type="text" inputmode="numeric" value="${moedaInput(v.meta)}" oninput="mascaraMoeda(this)" placeholder="0,00" style="text-transform:none"></div>
     </div>
     <div id="gerente-fields" style="${v.role==='gerente'?'':'display:none'}">
       <div style="margin-top:12px"><label style="display:block;font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px">Vendedores supervisionados</label>
@@ -2086,7 +2139,7 @@ function salvarVendedor(){
   const role=g('fv-role');
   let gVend=[];
   if(role==='gerente') document.querySelectorAll('#gerente-fields input[type=checkbox]:checked').forEach(cb=>gVend.push(cb.value));
-  const meta=parseFloat(document.getElementById('fv-meta')?.value||0)||0;
+  const meta=parseMoeda(document.getElementById('fv-meta')?.value||'0');
   const obj={nome,cargo:g('fv-cargo').toUpperCase(),role,email:g('fv-email'),meta,gerenteVendedores:gVend};
   if(editVendedorId){
     const i=usuarios.findIndex(v=>v.nome===editVendedorId);
