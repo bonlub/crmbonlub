@@ -3219,30 +3219,42 @@ function handleDofDrop(e){ e.preventDefault(); document.getElementById('dof-zone
 function handleVdDrop(e){ e.preventDefault(); document.getElementById('vd-zone').classList.remove('drag'); carregarVd(e.dataTransfer.files[0]); }
 
 function carregarDof(file){
-  if(!file) return;
+  if(!file){ toast('Selecione o arquivo relEmissaoDOF','err'); return; }
+  if(typeof XLSX==='undefined'){ toast('Biblioteca XLSX não carregada. Recarregue a página.','err'); return; }
   const r=new FileReader();
   r.onload=e=>{
-    const wb=XLSX.read(e.target.result,{type:'binary',cellDates:true});
-    const ws=wb.Sheets[wb.SheetNames[0]];
-    symplexDof=XLSX.utils.sheet_to_json(ws,{header:1,raw:false,dateNF:'yyyy-mm-dd'});
-    document.getElementById('dof-label').textContent='✓ '+file.name;
-    document.getElementById('dof-zone').style.background='var(--g-bg)';
-    tentarConciliar();
+    try{
+      const data=e.target.result;
+      const wb=XLSX.read(data,{type:'binary',cellDates:true});
+      const ws=wb.Sheets[wb.SheetNames[0]];
+      symplexDof=XLSX.utils.sheet_to_json(ws,{header:1,raw:false,dateNF:'yyyy-mm-dd'});
+      document.getElementById('dof-label').textContent='✓ '+file.name;
+      document.getElementById('dof-zone').style.background='var(--g-bg)';
+      toast('DOF carregado: '+symplexDof.length+' linhas','ok');
+      tentarConciliar();
+    }catch(err){ toast('Erro ao ler DOF: '+err.message,'err'); console.error(err); }
   };
+  r.onerror=()=>toast('Erro ao ler arquivo','err');
   r.readAsBinaryString(file);
 }
 
 function carregarVd(file){
-  if(!file) return;
+  if(!file){ toast('Selecione o arquivo relVendasDiaria','err'); return; }
+  if(typeof XLSX==='undefined'){ toast('Biblioteca XLSX não carregada. Recarregue a página.','err'); return; }
   const r=new FileReader();
   r.onload=e=>{
-    const wb=XLSX.read(e.target.result,{type:'binary',cellDates:true});
-    const ws=wb.Sheets[wb.SheetNames[0]];
-    symplexVd=XLSX.utils.sheet_to_json(ws,{header:1,raw:false,dateNF:'yyyy-mm-dd'});
-    document.getElementById('vd-label').textContent='✓ '+file.name;
-    document.getElementById('vd-zone').style.background='var(--g-bg)';
-    tentarConciliar();
+    try{
+      const data=e.target.result;
+      const wb=XLSX.read(data,{type:'binary',cellDates:true});
+      const ws=wb.Sheets[wb.SheetNames[0]];
+      symplexVd=XLSX.utils.sheet_to_json(ws,{header:1,raw:false,dateNF:'yyyy-mm-dd'});
+      document.getElementById('vd-label').textContent='✓ '+file.name;
+      document.getElementById('vd-zone').style.background='var(--g-bg)';
+      toast('VD carregado: '+symplexVd.length+' linhas','ok');
+      tentarConciliar();
+    }catch(err){ toast('Erro ao ler VD: '+err.message,'err'); console.error(err); }
   };
+  r.onerror=()=>toast('Erro ao ler arquivo','err');
   r.readAsBinaryString(file);
 }
 
