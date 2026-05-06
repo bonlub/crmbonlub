@@ -294,7 +294,7 @@ tbody tr:hover td{background:var(--surface2);}
         <button class="nav-btn active" onclick="nav('funil',this)">Funil</button>
         <button class="nav-btn" onclick="nav('tarefas',this)" id="btn-nav-tarefas">Tarefas<span class="nav-badge" id="badge-tarefas" style="display:none">0</span></button>
         <button class="nav-btn" id="btn-nav-oport" onclick="nav('oportunidades',this)">🎯 Oportunidades</button>
-        <button class="nav-btn" onclick="nav('clientes',this)">Clientes</button>
+        <button class="nav-btn" onclick="nav('clientes',this)">Clientes<span class="nav-badge" id="badge-exclusoes" style="display:none">0</span></button>
         <button class="nav-btn" onclick="nav('dashboard',this)">Dashboard</button>
         <button class="nav-btn" id="btn-nav-vendors" style="display:none" onclick="nav('vendedores',this)">Equipe</button>
         <button class="nav-btn" id="btn-nav-importar" style="display:none" onclick="nav('importar',this)">Importar</button>
@@ -532,6 +532,39 @@ tbody tr:hover td{background:var(--surface2);}
         </div>
 
         <div style="background:var(--surface);border:0.5px solid var(--border);border-radius:var(--radius-lg);padding:1.25rem">
+          <div style="font-size:13px;font-weight:600;margin-bottom:.75rem">🕐 Restrição de horário de acesso</div>
+          <p style="font-size:12px;color:var(--text2);margin-bottom:10px;line-height:1.6">Define os horários permitidos para login. Fora do intervalo o acesso é bloqueado. Deixe em branco para sem restrição.</p>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+            <div class="frow"><label>Acesso permitido a partir de</label>
+              <input type="time" id="cfg-hora-ini" style="width:100%;padding:7px 10px;border:0.5px solid var(--border2);border-radius:var(--radius);font-size:13px;font-family:var(--font);background:var(--surface);color:var(--text)">
+            </div>
+            <div class="frow"><label>Acesso permitido até</label>
+              <input type="time" id="cfg-hora-fim" style="width:100%;padding:7px 10px;border:0.5px solid var(--border2);border-radius:var(--radius);font-size:13px;font-family:var(--font);background:var(--surface);color:var(--text)">
+            </div>
+          </div>
+          <div class="frow" style="margin-bottom:10px">
+            <label>Aplicar restrição para</label>
+            <select id="cfg-hora-roles" style="width:100%;padding:7px 10px;border:0.5px solid var(--border2);border-radius:var(--radius);font-size:13px;font-family:var(--font);background:var(--surface);color:var(--text)">
+              <option value="vendedor">Somente vendedores</option>
+              <option value="vendedor,gerente">Vendedores e gerentes</option>
+              <option value="todos">Todos (inclusive gestor)</option>
+            </select>
+          </div>
+          <button class="btn-primary" onclick="salvarRestricaoHorario()" style="width:100%">Salvar restrição</button>
+          <div id="cfg-hora-status" style="margin-top:8px;font-size:12px"></div>
+        </div>
+
+        <div style="background:var(--surface);border:0.5px solid var(--border);border-radius:var(--radius-lg);padding:1.25rem">
+          <div style="font-size:13px;font-weight:600;margin-bottom:.5rem">🚀 Publicar atualização</div>
+          <p style="font-size:12px;color:var(--text2);margin-bottom:10px;line-height:1.6">
+            Após subir uma nova versão no GitHub, clique aqui para sinalizar a atualização. Todos os usuários conectados serão desconectados automaticamente e redirecionados para a versão nova na próxima sincronização (até 1 minuto).
+          </p>
+          <div style="font-size:11px;color:var(--text3);margin-bottom:10px">Versão atual do sistema: <strong>v${build}</strong></div>
+          <button class="btn-primary" style="width:100%;background:#1D4ED8;border-color:#1E40AF" onclick="publicarAtualizacao()">🚀 Publicar versão ${build} para todos</button>
+          <div id="pub-status" style="margin-top:8px;font-size:12px"></div>
+        </div>
+
+        <div style="background:var(--surface);border:0.5px solid var(--border);border-radius:var(--radius-lg);padding:1.25rem">
           <div style="font-size:13px;font-weight:600;margin-bottom:.5rem">🤖 Inteligência Artificial</div>
           <p style="font-size:12px;color:var(--text2);margin-bottom:10px;line-height:1.6">Cole sua chave de API da Anthropic para ativar sugestões de IA para os vendedores. Obtenha em <a href="https://console.anthropic.com" target="_blank" style="color:var(--c-text)">console.anthropic.com</a></p>
           <div class="frow" style="margin-bottom:8px"><label>Chave de API (Anthropic)</label>
@@ -695,6 +728,12 @@ function fazerLogin(){
   const senha=document.getElementById('lg-pass').value;
   const u=usuarios.find(x=>x.nome===nome);
   if(!u||u.senha!==senha){ toast('Usuário ou senha incorretos.','err'); return; }
+  // Verificar restrição de horário
+  if(!verificarRestricaoHorario(u.role)){
+    const r=CONFIG.restricaoHorario;
+    toast(`Acesso bloqueado fora do horário permitido (${r.ini} – ${r.fim}).`,'err');
+    return;
+  }
   CFG={nome:u.nome,role:u.role};
   localStorage.setItem('crm6_session',JSON.stringify(CFG));
   registrarLog('login','Login realizado',`Perfil: ${u.role}`);
@@ -910,13 +949,16 @@ function moedaInput(valor){
 async function syncRemote(){
   try{
     const ref=db.collection('crm').doc('dados');
-    await ref.set({
+    const payload={
       deals:JSON.stringify(deals),
       clientes:JSON.stringify(clientes),
       usuarios:JSON.stringify(usuarios),
       tarefas:JSON.stringify(tarefas),
       updatedAt:new Date().toISOString()
-    });
+    };
+    // Gestor sempre publica o build atual
+    if(CFG.role==='gestor') payload.appBuild=build;
+    await ref.set(payload,{merge:true});
   }catch(e){ console.log('Firebase sync error:',e); }
 }
 
@@ -926,6 +968,16 @@ async function carregarDoFirebase(){
     const doc=await ref.get({ source: 'server' });
     if(doc.exists){
       const d=doc.data();
+      // Verificar se há versão mais nova publicada pelo gestor
+      if(d.appBuild&&d.appBuild!==build){
+        console.log(`Nova versão detectada: ${d.appBuild} (local: ${build}). Recarregando...`);
+        // Limpar sessão local e forçar reload sem cache
+        localStorage.removeItem('crm6_session');
+        const url=new URL(window.location.href);
+        url.searchParams.set('v',d.appBuild);
+        window.location.replace(url.toString());
+        return false;
+      }
       if(d.clientes){ clientes=JSON.parse(d.clientes); }
       if(d.deals){ deals=JSON.parse(d.deals); }
       if(d.tarefas){ tarefas=JSON.parse(d.tarefas); }
@@ -1041,7 +1093,7 @@ function nav(name,btn){
   btn.classList.add('active');
   renderAll();
 }
-function renderAll(){ limparDadosDeOutrosVendedores(); renderFunil(); renderTarefas(); renderClientes(); renderDashboard(); renderVendedores(); populaFiltros(); atualizarBadgeTarefas(); atualizarBadgeSymplex(); renderConfig(); renderLog(); renderPendencias(); renderOportunidades(); }
+function renderAll(){ limparDadosDeOutrosVendedores(); renderFunil(); renderTarefas(); renderClientes(); renderDashboard(); renderVendedores(); populaFiltros(); atualizarBadgeTarefas(); atualizarBadgeSymplex(); atualizarBadgeExclusoes(); renderConfig(); renderLog(); renderPendencias(); renderOportunidades(); }
 
 // ══════════════════════════════════════════════════════════
 //  NOTIFICAÇÃO TAREFAS VENCIDAS
@@ -1545,6 +1597,13 @@ function acSelecionar(id,nome){
 // ══════════════════════════════════════════════════════════
 //  TAREFAS
 // ══════════════════════════════════════════════════════════
+function atualizarBadgeExclusoes(){
+  if(CFG.role!=='gestor') return;
+  const n=clientes.filter(c=>c.solicitacaoExclusao&&!c.solicitacaoExclusao.atendida).length;
+  const b=document.getElementById('badge-exclusoes'); if(!b) return;
+  if(n>0){ b.textContent=n; b.style.display=''; } else b.style.display='none';
+}
+
 function atualizarBadgeSymplex(){
   const pends=CONFIG.symplexPendencias||[];
   // Filtrar por vendedor se não for gestor
@@ -1900,6 +1959,8 @@ function renderClientes(){
   tb.innerHTML=lista.map(c=>{
     const podeExcluir=CFG.role==='gestor';
     const podeEditar=CFG.role!=='gerente';
+    const temSolExclusao=c.solicitacaoExclusao&&!c.solicitacaoExclusao.atendida;
+    const podesolicitarExclusao=CFG.role==='vendedor'&&!temSolExclusao;
     const temHist=deals.some(d=>d.clienteId===c.id);
     const statusCls=c.status==='CLIENTE ATIVO'?'ativo':c.status==='CLIENTE INATIVO'?'inativo':'lead';
     const agora=new Date();
@@ -1931,7 +1992,10 @@ function renderClientes(){
         ${CFG.role!=='gerente'?`<button class="btn-sm" style="color:#5B21B6;border-color:#DDD6FE;background:#F5F3FF" onclick="abrirTarefa(null,'${c.id}')">+ Tarefa</button> `:''}
         ${podeEditar?`<button class="btn-sm" onclick="abrirCliente('${c.id}')">Editar</button> `:''}
         ${temHist?`<button class="btn-sm" onclick="verHistCliente('${c.id}')">Hist.</button> `:''}
-        ${podeExcluir?`<button class="btn-sm" style="color:#881337" onclick="deletarCliente('${c.id}')">×</button>`:''}
+        ${podeExcluir&&temSolExclusao?`<button class="btn-sm" style="background:var(--p-bg);color:var(--p-text);border-color:var(--p-border);font-weight:700" onclick="verSolicitacaoExclusao('${c.id}')" title="${esc(c.solicitacaoExclusao?.motivo||'')}">🗑 Excluir?</button>`:''}
+        ${podeExcluir&&!temSolExclusao?`<button class="btn-sm" style="color:#881337" onclick="deletarCliente('${c.id}')">×</button>`:''}
+        ${podesolicitarExclusao?`<button class="btn-sm" style="color:#6B7280;border-color:#D1D5DB" onclick="solicitarExclusaoCliente('${c.id}')" title="Solicitar exclusão ao gestor">🗑</button>`:''}
+        ${temSolExclusao&&CFG.role==='vendedor'?`<span style="font-size:10px;color:var(--o-text)">⏳ Exclusão pendente</span>`:''}
       </td>
       <td style="font-family:var(--mono);font-size:11px;color:var(--text3)">${esc(c.codCliente||'—')}</td>
       <td style="font-weight:600">${esc(c.razaoSocial||'—')}${c.categoria?`<span style="font-size:9px;font-weight:600;padding:1px 5px;border-radius:4px;background:var(--surface2);color:var(--text3);margin-left:4px">${esc(c.categoria)}</span>`:''}</td>
@@ -2108,6 +2172,60 @@ function salvarCliente(){
   saveLocal(); syncRemote(); fecharModal(); renderClientes();
   _skipCpfValidation=false;
   registrarLog('cliente', editClienteId?'Cliente editado':'Cliente criado', rs);
+}
+
+function solicitarExclusaoCliente(id){
+  const c=clientes.find(x=>x.id===id); if(!c) return;
+  modal(`<h3>🗑 Solicitar exclusão ao gestor</h3>
+    <p style="font-size:13px;color:var(--text2);margin-bottom:1rem">Cliente: <strong>${esc(c.razaoSocial)}</strong></p>
+    <div class="frow" style="margin-bottom:1rem">
+      <label>Motivo da solicitação *</label>
+      <textarea id="sol-exc-motivo" rows="3" placeholder="Descreva o motivo para exclusão..." style="width:100%;padding:8px 10px;border:0.5px solid var(--border2);border-radius:var(--radius);font-size:13px;font-family:var(--font);background:var(--surface);color:var(--text);resize:vertical"></textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-outline" onclick="fecharModal()">Cancelar</button>
+      <button class="btn-primary" style="background:#DC2626;border-color:#DC2626" onclick="confirmarSolicitacaoExclusao('${id}')">Enviar solicitação</button>
+    </div>`);
+}
+
+function confirmarSolicitacaoExclusao(id){
+  const motivo=document.getElementById('sol-exc-motivo')?.value.trim();
+  if(!motivo){ toast('Informe o motivo da solicitação.','err'); return; }
+  const c=clientes.find(x=>x.id===id); if(!c) return;
+  c.solicitacaoExclusao={motivo,solicitadoPor:CFG.nome,data:hoje(),atendida:false};
+  saveLocal(); syncRemote();
+  registrarLog('cliente','Solicitação de exclusão',`${c.razaoSocial} — ${motivo}`);
+  fecharModal();
+  toast('Solicitação enviada ao gestor!','ok');
+  renderClientes();
+}
+
+function verSolicitacaoExclusao(id){
+  const c=clientes.find(x=>x.id===id); if(!c) return;
+  const s=c.solicitacaoExclusao;
+  modal(`<h3>🗑 Solicitação de exclusão</h3>
+    <div style="background:var(--p-bg);border:0.5px solid var(--p-border);border-radius:var(--radius-lg);padding:14px;margin-bottom:1rem">
+      <div style="font-size:13px;font-weight:600;margin-bottom:6px">${esc(c.razaoSocial)}</div>
+      <div style="font-size:12px;color:var(--text2);margin-bottom:4px">Solicitado por: <strong>${esc(s.solicitadoPor)}</strong> em ${esc(s.data)}</div>
+      <div style="font-size:13px;color:var(--p-text);margin-top:8px"><strong>Motivo:</strong> ${esc(s.motivo)}</div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-outline" onclick="recusarExclusao('${id}')">✗ Recusar</button>
+      <button class="btn-primary" style="background:#DC2626;border-color:#DC2626" onclick="confirmarExclusaoGestor('${id}')">🗑 Confirmar exclusão</button>
+    </div>`);
+}
+
+function recusarExclusao(id){
+  const c=clientes.find(x=>x.id===id); if(!c) return;
+  c.solicitacaoExclusao.atendida=true;
+  c.solicitacaoExclusao.resultado='recusada';
+  saveLocal(); syncRemote();
+  fecharModal(); toast('Solicitação recusada.','ok'); renderClientes();
+}
+
+function confirmarExclusaoGestor(id){
+  fecharModal();
+  deletarCliente(id);
 }
 
 function deletarCliente(id){
@@ -2887,12 +3005,59 @@ function salvarConfig(){
   toast('Configurações salvas!','ok');
 }
 
+async function publicarAtualizacao(){
+  const btn=event.target;
+  btn.disabled=true; btn.textContent='⏳ Publicando...';
+  try{
+    const ref=db.collection('crm').doc('dados');
+    await ref.set({appBuild:build,updatedAt:new Date().toISOString()},{merge:true});
+    const st=document.getElementById('pub-status');
+    if(st) st.innerHTML=`<span style="color:var(--g-text)">✓ Versão ${build} publicada! Usuários serão atualizados na próxima sincronização.</span>`;
+    toast(`Versão ${build} publicada para todos!`,'ok');
+  }catch(e){
+    toast('Erro ao publicar: '+e.message,'err');
+  }
+  btn.disabled=false; btn.textContent=`🚀 Publicar versão ${build} para todos`;
+}
+
+function salvarRestricaoHorario(){
+  const ini=document.getElementById('cfg-hora-ini')?.value||'';
+  const fim=document.getElementById('cfg-hora-fim')?.value||'';
+  const roles=document.getElementById('cfg-hora-roles')?.value||'vendedor';
+  CONFIG.restricaoHorario={ini,fim,roles};
+  localStorage.setItem('crm7_config',JSON.stringify(CONFIG));
+  const st=document.getElementById('cfg-hora-status');
+  if(st) st.innerHTML=ini&&fim?`<span style="color:var(--g-text)">✓ Restrição ativa: ${ini} às ${fim} para ${roles}</span>`:`<span style="color:var(--text3)">Sem restrição configurada.</span>`;
+  toast('Restrição de horário salva!','ok');
+}
+
+function verificarRestricaoHorario(role){
+  const r=CONFIG.restricaoHorario;
+  if(!r||!r.ini||!r.fim) return true; // sem restrição
+  const roles=r.roles||'vendedor';
+  // Verificar se aplica para este role
+  if(roles==='vendedor'&&role!=='vendedor') return true;
+  if(roles==='vendedor,gerente'&&role==='gestor') return true;
+  // Verificar horário atual
+  const agora=new Date();
+  const hh=agora.getHours().toString().padStart(2,'0');
+  const mm=agora.getMinutes().toString().padStart(2,'0');
+  const horaAtual=`${hh}:${mm}`;
+  return horaAtual>=r.ini&&horaAtual<=r.fim;
+}
+
 function renderConfig(){
   const el=document.getElementById('cfg-dias-inativo'); if(el) el.value=CONFIG.diasInativo||90;
   const el2=document.getElementById('cfg-dias-vinculo'); if(el2) el2.value=CONFIG.diasVinculo||90;
   const el3=document.getElementById('cfg-dias-label'); if(el3) el3.textContent=CONFIG.diasInativo||90;
   const elAi=document.getElementById('cfg-ai-key'); if(elAi) elAi.value=CONFIG.aiKey||'';
-  const lista=document.getElementById('cfg-funcoes-lista'); if(!lista) return;
+  // Restrição de horário
+  const rh=CONFIG.restricaoHorario||{};
+  const elHIni=document.getElementById('cfg-hora-ini'); if(elHIni) elHIni.value=rh.ini||'';
+  const elHFim=document.getElementById('cfg-hora-fim'); if(elHFim) elHFim.value=rh.fim||'';
+  const elHRoles=document.getElementById('cfg-hora-roles'); if(elHRoles) elHRoles.value=rh.roles||'vendedor';
+  const st=document.getElementById('cfg-hora-status');
+  if(st) st.innerHTML=rh.ini&&rh.fim?`<span style="color:var(--g-text)">✓ Restrição ativa: ${rh.ini} às ${rh.fim} para ${rh.roles||'vendedor'}</span>`:`<span style="color:var(--text3)">Sem restrição configurada.</span>`;  const lista=document.getElementById('cfg-funcoes-lista'); if(!lista) return;
   lista.innerHTML=(CONFIG.funcoes||[]).map((f,i)=>`<div style="display:flex;align-items:center;gap:6px;margin-bottom:5px">
     <span style="flex:1;font-size:12px;padding:5px 8px;background:var(--surface2);border-radius:var(--radius)">${esc(f)}</span>
     <button class="btn-sm" style="font-size:10px;padding:3px 7px;color:#881337" onclick="removerFuncao(${i})">×</button>
@@ -3199,6 +3364,8 @@ function tentarConciliar(){
 
   // Fix: Filtrar NFs canceladas — só processar NFs que existem em AMBOS os relatórios
   // Fix: Ignorar NFs de vendedores não cadastrados no CRM
+  // Fix: Ignorar clientes anteriormente recusados
+  const recusados=(CONFIG.symplexPendencias||[]).filter(p=>p.recusado);
   symplexConciliado=vendasDof
     .filter(v=>{
       if(!mapaVd[v.nf]) return false; // cancelada
@@ -3207,10 +3374,24 @@ function tentarConciliar(){
       // Verificar se vendedor existe no CRM (match parcial por primeiro nome)
       const u=usuarios.find(x=>{
         const n=x.nome.toUpperCase();
-        const v=vendNome.toUpperCase();
-        return n===v||n.startsWith(v)||v.startsWith(n);
+        const vn=vendNome.toUpperCase();
+        return n===vn||n.startsWith(vn)||vn.startsWith(n);
       });
       if(!u){ console.log(`Symplex: NF ${v.nf} ignorada — vendedor "${vendNome}" não cadastrado no CRM`); return false; }
+      // Verificar se cliente foi anteriormente recusado
+      const cnpjLimpo=v.cnpj.replace(/\D/g,'');
+      const jaRecusado=recusados.some(p=>{
+        if(p.cnpj&&cnpjLimpo&&p.cnpj===cnpjLimpo) return true;
+        if(p.razaoSocial&&normalize(p.razaoSocial)===normalize(v.razaoSocial)) return true;
+        // Verificar pelo cliente ainda existente
+        const cr=clientes.find(x=>x.id===p.clienteId);
+        if(cr){
+          if(cr.cnpj&&cnpjLimpo&&cr.cnpj.replace(/\D/g,'')===cnpjLimpo) return true;
+          if(normalize(cr.razaoSocial)===normalize(v.razaoSocial)) return true;
+        }
+        return false;
+      });
+      if(jaRecusado){ console.log(`Symplex: NF ${v.nf} ignorada — cliente "${v.razaoSocial}" foi recusado anteriormente`); return false; }
       return true;
     })
     .map(v=>{
@@ -3423,7 +3604,7 @@ function processarSymplex(){
       nfs.forEach(nfObj=>{
         deals.push({id:uid(),clienteId:novoCliente.id,valor:nfObj.valor,etapa:'ganho',vendedor:novoCliente.vendedor||CFG.nome,data:nfObj.data||hoje(),obs:'IMPORTADO DO SYMPLEX',motivo:'',numOrcamento:nfObj.nf,historico:[{etapa:'ganho',data:nfObj.data||hoje(),obs:'SYMPLEX',autor:'SISTEMA'}]});
       });
-      pendencias.push({clienteId:novoCliente.id,tipo:'novo',razaoSocial:novoCliente.razaoSocial,nfs:nfs.map(n=>n.nf).join(', ')});
+      pendencias.push({clienteId:novoCliente.id,tipo:'novo',razaoSocial:novoCliente.razaoSocial,cnpj:novoCliente.cnpj.replace(/\D/g,''),nfs:nfs.map(n=>n.nf).join(', ')});
       criados++;
     }
   });
@@ -3566,6 +3747,21 @@ function marcarRevisado(clienteId){
   if(p) p.revisado=true;
   localStorage.setItem('crm7_config',JSON.stringify(CONFIG));
   renderPendencias(); atualizarBadgeSymplex();
+  // Após validar, oferecer agendamento de contato
+  const c=clientes.find(x=>x.id===clienteId);
+  if(!c) return;
+  modal(`<h3>✓ Cliente validado!</h3>
+    <div style="background:var(--g-bg);border:0.5px solid var(--g-border);border-radius:var(--radius-lg);padding:12px;margin-bottom:1rem">
+      <div style="font-size:13px;font-weight:600">${esc(c.razaoSocial)}</div>
+      <div style="font-size:11px;color:var(--text3);margin-top:2px">${esc(c.cidade||'')}${c.estado?'/'+c.estado:''} · ${esc(c.vendedor||'Sem vínculo')}</div>
+    </div>
+    <p style="font-size:13px;color:var(--text2);margin-bottom:1.25rem;line-height:1.6">
+      Deseja agendar um contato com este cliente agora?
+    </p>
+    <div class="modal-actions">
+      <button class="btn-outline" onclick="fecharModal()">Agora não</button>
+      <button class="btn-primary" onclick="fecharModal();abrirTarefa(null,'${clienteId}')">📅 Agendar contato</button>
+    </div>`);
 }
 
 // ── Exibir histórico de compras no modal de dados do cliente ─
@@ -3623,17 +3819,56 @@ function carregarFirebase(){
     localStorage.removeItem('crm6_session');
     localStorage.setItem('crm6_versao','13.1');
   }
-  // Carregar localStorage como fallback inicial
-  usuarios=JSON.parse(localStorage.getItem('crm6_usuarios')||'[]');
+
+  // Carregar localStorage imediatamente
+  const localUsuarios=JSON.parse(localStorage.getItem('crm6_usuarios')||'[]');
   deals=JSON.parse(localStorage.getItem('crm6_deals')||'[]');
   clientes=JSON.parse(localStorage.getItem('crm6_clientes')||'[]');
   vendedores=JSON.parse(localStorage.getItem('crm6_vendors')||'[]');
   tarefas=JSON.parse(localStorage.getItem('crm6_tarefas')||'[]');
   log_=JSON.parse(localStorage.getItem('crm6_log')||'[]');
+  usuarios=localUsuarios;
   if(!usuarios.length) seedUsuarios();
-  await carregarFirebase();
+
+  // Liberar login imediatamente com dados locais
   const sess=localStorage.getItem('crm6_session');
-  if(sess){ CFG=JSON.parse(sess); iniciarApp(); }
+  if(sess){
+    const sessObj=JSON.parse(sess);
+    const u=usuarios.find(x=>x.nome===sessObj.nome);
+    if(u){ CFG=sessObj; }
+    else localStorage.removeItem('crm6_session');
+  }
+
+  // Conectar Firebase em background (sem bloquear)
+  try{
+    await carregarFirebase();
+    const ref=db.collection('crm').doc('dados');
+    const doc=await Promise.race([
+      ref.get({source:'server'}),
+      new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),5000))
+    ]);
+    if(doc.exists){
+      const d=doc.data();
+      // Verificar versão
+      if(d.appBuild&&d.appBuild!==build){
+        const url=new URL(window.location.href);
+        url.searchParams.set('v',d.appBuild);
+        window.location.replace(url.toString());
+        return;
+      }
+      if(d.usuarios){ usuarios=JSON.parse(d.usuarios); vendedores=usuarios.filter(u=>u.role!=='gestor'); }
+      if(d.clientes){ clientes=JSON.parse(d.clientes); }
+      if(d.deals){ deals=JSON.parse(d.deals); }
+      if(d.tarefas){ tarefas=JSON.parse(d.tarefas); }
+      clientes.forEach(c=>{ if(c.cnpj) c.cnpj=c.cnpj.replace(/\D/g,''); if(c.ie) c.ie=c.ie.replace(/\D/g,''); });
+      saveLocal();
+      // Se já estava logado, atualizar tela com dados novos
+      if(CFG.nome) renderAll();
+    }
+  }catch(e){ console.log('Firebase background error:',e.message); }
+
+  // Iniciar app se havia sessão válida
+  if(CFG.nome) iniciarApp();
 })();
 </script>
 </body>
