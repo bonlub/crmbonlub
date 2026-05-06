@@ -1614,7 +1614,7 @@ function atualizarBadgeSymplex(){
     if(p.revisado) return false;
     if(CFG.role==='gestor') return true;
     const c=clientes.find(x=>x.id===p.clienteId);
-    return c&&(c.vendedor===CFG.nome||(!c.vendedor&&p.tipo==='novo'));
+    return c&&c.vendedor===CFG.nome;
   });
   const badge=document.getElementById('badge-symplex');
   if(!badge) return;
@@ -3665,7 +3665,8 @@ function renderPendencias(){
   const pendsFiltradas=pends.filter(p=>{
     if(CFG.role==='gestor') return true;
     const c=clientes.find(x=>x.id===p.clienteId);
-    return c&&(c.vendedor===CFG.nome||c.cadastradoPor==='SYMPLEX'&&!c.vendedor);
+    if(!c) return false;
+    return c.vendedor===CFG.nome;
   });
   const ativas=pendsFiltradas.filter(p=>!p.revisado);
   if(badge) badge.textContent=ativas.length?ativas.length+' pendente'+(ativas.length>1?'s':''):'';
