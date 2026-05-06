@@ -620,7 +620,7 @@ tbody tr:hover td{background:var(--surface2);}
             <strong id="dof-label">Clique ou arraste</strong>
             <span style="font-size:11px"> relEmissaoDOF.xlsx</span>
           </div>
-          <input type="file" id="dof-in" accept=".xlsx,.xls" style="display:none">
+          <input type="file" id="dof-in" accept=".xlsx,.xls" style="display:none" onchange="carregarDof(this.files[0])">
         </div>
         <div style="background:var(--surface);border:0.5px solid var(--border);border-radius:var(--radius-lg);padding:1.25rem">
           <div style="font-size:13px;font-weight:600;margin-bottom:.5rem">2. relVendasDiaria <span style="font-size:10px;color:var(--text3)">(vendedores + NFs)</span></div>
@@ -630,7 +630,7 @@ tbody tr:hover td{background:var(--surface2);}
             <strong id="vd-label">Clique ou arraste</strong>
             <span style="font-size:11px"> relVendasDiaria.xlsx</span>
           </div>
-          <input type="file" id="vd-in" accept=".xlsx,.xls" style="display:none">
+          <input type="file" id="vd-in" accept=".xlsx,.xls" style="display:none" onchange="carregarVd(this.files[0])">
         </div>
       </div>
 
@@ -664,7 +664,7 @@ tbody tr:hover td{background:var(--surface2);}
           ondragleave="this.classList.remove('drag')" ondrop="handleDrop(event)">
           <strong>Clique aqui ou arraste o arquivo</strong>.xlsx, .xls ou .csv
         </div>
-        <input type="file" id="file-in" accept=".xlsx,.xls,.csv" style="display:none">
+        <input type="file" id="file-in" accept=".xlsx,.xls,.csv" style="display:none" onchange="handleFile(this.files[0])">
         <div id="import-body"></div>
         <div id="import-result" style="display:none;margin-top:1rem;padding:12px 14px;border-radius:var(--radius);font-size:13px;background:var(--g-bg);color:var(--g-text)"></div>
       </div>
@@ -1603,9 +1603,11 @@ function atualizarBadgeSymplex(){
     if(p.revisado) return false;
     if(CFG.role==='gestor') return true;
     const c=clientes.find(x=>x.id===p.clienteId);
-    const vendCliente=c?c.vendedor:'';
-    const vendPendencia=p.vendedor||'';
-    return vendCliente===CFG.nome||vendPendencia===CFG.nome;
+    const vC=(c?c.vendedor:'')||'';
+    const vP=p.vendedor||'';
+    const n=CFG.nome||'';
+    return vC.toUpperCase().startsWith(n.toUpperCase())||n.toUpperCase().startsWith(vC.toUpperCase())||
+           vP.toUpperCase().startsWith(n.toUpperCase())||n.toUpperCase().startsWith(vP.toUpperCase());
   });
   const badge=document.getElementById('badge-symplex');
   if(!badge) return;
@@ -2513,15 +2515,7 @@ function handleFile(file){
   r.onload=e=>{ const wb=XLSX.read(e.target.result,{type:'binary'}); const ws=wb.Sheets[wb.SheetNames[0]]; const rows=XLSX.utils.sheet_to_json(ws,{header:1}); importHeaders=rows[0]||[]; importData=rows.slice(1).filter(r=>r.some(c=>c)); mostrarMapeamento(); };
   r.readAsBinaryString(file);
 }
-// Registrar listeners de arquivo com delay para garantir DOM pronto
-setTimeout(()=>{
-  const fi=document.getElementById('file-in');
-  if(fi) fi.addEventListener('change',function(){ handleFile(this.files[0]); });
-  const di=document.getElementById('dof-in');
-  if(di) di.addEventListener('change',function(){ carregarDof(this.files[0]); });
-  const vi=document.getElementById('vd-in');
-  if(vi) vi.addEventListener('change',function(){ carregarVd(this.files[0]); });
-},500);
+// Listeners registrados via onchange inline nos inputs de arquivo
 const CMAP={'Cod. Cliente':'codCliente','Razão Social':'razaoSocial','Nome Fantasia':'nomeFantasia','CNPJ/CPF':'cnpj','WhatsApp':'whatsapp','Telefone':'tel','Telefone 2':'tel2','Telefone 3':'tel3','E-mail':'email','E-mail 2':'email2','Contato':'contato','Cidade':'cidade','Estado':'estado','Transportadora':'transportadora','Status':'status','Observações':'obs'};
 const CAMPOS_IMP=['(ignorar)',...Object.keys(CMAP)];
 function autoMapI(h){ h=h.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,''); if(/cod|codigo|client/.test(h)) return 'Cod. Cliente'; if(/razao|rs/.test(h)) return 'Razão Social'; if(/fantasia|nf/.test(h)) return 'Nome Fantasia'; if(/cnpj|cpf/.test(h)) return 'CNPJ/CPF'; if(/whats|zap/.test(h)) return 'WhatsApp'; if(/tel3|fone3/.test(h)) return 'Telefone 3'; if(/tel2|fone2/.test(h)) return 'Telefone 2'; if(/tel|fone|celular/.test(h)) return 'Telefone'; if(/email2|mail2/.test(h)) return 'E-mail 2'; if(/email|mail/.test(h)) return 'E-mail'; if(/contato|responsavel/.test(h)) return 'Contato'; if(/cidade/.test(h)) return 'Cidade'; if(/estado|uf/.test(h)) return 'Estado'; if(/transp/.test(h)) return 'Transportadora'; if(/status/.test(h)) return 'Status'; if(/obs|nota/.test(h)) return 'Observações'; return '(ignorar)'; }
@@ -3606,7 +3600,14 @@ function processarSymplex(){
       nfs.forEach(nfObj=>{
         deals.push({id:uid(),clienteId:novoCliente.id,valor:nfObj.valor,etapa:'ganho',vendedor:vendedorFinal||CFG.nome,data:nfObj.data||hoje(),obs:'IMPORTADO DO SYMPLEX',motivo:'',numOrcamento:nfObj.nf,historico:[{etapa:'ganho',data:nfObj.data||hoje(),obs:'SYMPLEX',autor:'SISTEMA'}]});
       });
-      pendencias.push({clienteId:novoCliente.id,tipo:'novo',razaoSocial:novoCliente.razaoSocial,cnpj:novoCliente.cnpj.replace(/\D/g,''),nfs:nfs.map(n=>n.nf).join(', '),vendedor:vendedorFinal});
+      pendencias.push({
+        clienteId:novoCliente.id,tipo:'novo',
+        razaoSocial:novoCliente.razaoSocial,
+        cnpj:novoCliente.cnpj.replace(/\D/g,''),
+        cidade:novoCliente.cidade,estado:novoCliente.estado,
+        nfs:nfs.map(n=>n.nf).join(', '),
+        vendedor:vendedorFinal
+      });
       criados++;
     }
   });
@@ -3658,14 +3659,21 @@ function cancelarSymplex(){
 function renderPendencias(){
   const pends=CONFIG.symplexPendencias||[];
   const badge=document.getElementById('badge-pendencias');
-  // Filtrar por vendedor se não for gestor
+
+  // Match fuzzy de nomes (CRM pode ter nome completo, VD tem primeiro nome)
+  function nomeMatch(a,b){
+    if(!a||!b) return false;
+    const na=a.toUpperCase().trim(), nb=b.toUpperCase().trim();
+    return na===nb||na.startsWith(nb)||nb.startsWith(na);
+  }
+
+  // Filtrar por vendedor
   const pendsFiltradas=pends.filter(p=>{
     if(CFG.role==='gestor') return true;
     const c=clientes.find(x=>x.id===p.clienteId);
-    // Verificar pelo vendedor do cliente OU pelo vendedor salvo na pendência
     const vendCliente=c?c.vendedor:'';
     const vendPendencia=p.vendedor||'';
-    return vendCliente===CFG.nome||vendPendencia===CFG.nome;
+    return nomeMatch(vendCliente,CFG.nome)||nomeMatch(vendPendencia,CFG.nome);
   });
   const ativas=pendsFiltradas.filter(p=>!p.revisado);
   if(badge) badge.textContent=ativas.length?ativas.length+' pendente'+(ativas.length>1?'s':''):'';
@@ -3681,17 +3689,24 @@ function renderPendencias(){
   if(novos.length){
     html+=`<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--c-text);margin-bottom:6px">Novos clientes criados (${novos.length}) — completar ou recusar cadastro</div>`;
     html+=novos.map(p=>{
+      // Usar dados do cliente se encontrado, senão usar dados da própria pendência
       const c=clientes.find(x=>x.id===p.clienteId);
-      if(!c) return '';
+      const razaoSocial=c?c.razaoSocial:p.razaoSocial||'—';
+      const cnpj=c?c.cnpj:p.cnpj||'—';
+      const vendedor=c?c.vendedor:p.vendedor||'sem vínculo';
+      const cidade=c?(c.cidade||''):p.cidade||'';
+      const estado=c?(c.estado||''):p.estado||'';
+      const cId=p.clienteId;
       return `<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--c-bg);border:0.5px solid var(--c-border);border-radius:var(--radius);margin-bottom:5px;flex-wrap:wrap">
         <div style="flex:1;min-width:150px">
-          <div style="font-size:12px;font-weight:600">${esc(c.razaoSocial)}</div>
-          <div style="font-size:10px;color:var(--text3)">NFs: ${esc(p.nfs)} · CNPJ: ${esc(c.cnpj||'—')} · Vendedor: ${esc(c.vendedor||'sem vínculo')}</div>
+          <div style="font-size:12px;font-weight:600">${esc(razaoSocial)}</div>
+          <div style="font-size:10px;color:var(--text3)">NFs: ${esc(p.nfs)} · CNPJ: ${esc(cnpj||'—')} · Vendedor: ${esc(vendedor)}${cidade?' · '+cidade+(estado?'/'+estado:''):''}</div>
+          ${!c?`<div style="font-size:10px;color:var(--o-text);margin-top:2px">⚠️ Aguardando sincronização — recarregue a página</div>`:''}
         </div>
         <div style="display:flex;gap:5px;flex-wrap:wrap">
-          <button class="btn-sm" onclick="abrirCliente('${c.id}')">✏️ Completar</button>
-          <button class="btn-sm" style="background:var(--g-bg);color:var(--g-text);border-color:var(--g-border)" onclick="marcarRevisado('${p.clienteId}')">✓ Revisado</button>
-          <button class="btn-sm" style="background:var(--p-bg);color:var(--p-text);border-color:var(--p-border)" onclick="recusarCadastroSymplex('${p.clienteId}')">✕ Recusar</button>
+          ${c?`<button class="btn-sm" onclick="abrirCliente('${cId}')">✏️ Completar</button>`:'<button class="btn-sm" onclick="location.reload()">🔄 Sincronizar</button>'}
+          <button class="btn-sm" style="background:var(--g-bg);color:var(--g-text);border-color:var(--g-border)" onclick="marcarRevisado('${cId}')">✓ Revisado</button>
+          <button class="btn-sm" style="background:var(--p-bg);color:var(--p-text);border-color:var(--p-border)" onclick="recusarCadastroSymplex('${cId}')">✕ Recusar</button>
         </div>
       </div>`;
     }).join('');
