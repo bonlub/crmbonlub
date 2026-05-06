@@ -1630,9 +1630,11 @@ function atualizarBadgeSymplex(){
     const c=clientes.find(x=>x.id===p.clienteId);
     const vC=(c?c.vendedor:'')||'';
     const vP=p.vendedor||'';
-    const n=CFG.nome||'';
-    return vC.toUpperCase().startsWith(n.toUpperCase())||n.toUpperCase().startsWith(vC.toUpperCase())||
-           vP.toUpperCase().startsWith(n.toUpperCase())||n.toUpperCase().startsWith(vP.toUpperCase());
+    if(CFG.role==='gerente'){
+      const grp=meuGrupo();
+      return grp.some(g=>nomeVendedor(vC,g)||nomeVendedor(vP,g));
+    }
+    return nomeVendedor(vC,CFG.nome)||nomeVendedor(vP,CFG.nome);
   });
   const badge=document.getElementById('badge-symplex');
   if(!badge) return;
@@ -3597,7 +3599,7 @@ function processarSymplex(){
         return n===v||n.startsWith(v)||v.startsWith(n)||n.includes(v)||v.includes(n);
       });
       const nomeSymplex=uSymplex?uSymplex.nome:vendedorSymplex;
-      const vendedorDiferente=c.vendedor&&nomeSymplex&&c.vendedor!==nomeSymplex;
+      const vendedorDiferente=c.vendedor&&nomeSymplex&&!nomeVendedor(c.vendedor,nomeSymplex);
 
       // Só atualizar vendedor se cliente não tiver vínculo
       if(!c.vendedor&&nomeSymplex){
@@ -3714,20 +3716,17 @@ function renderPendencias(){
   const pends=CONFIG.symplexPendencias||[];
   const badge=document.getElementById('badge-pendencias');
 
-  // Match fuzzy de nomes (CRM pode ter nome completo, VD tem primeiro nome)
-  function nomeMatch(a,b){
-    if(!a||!b) return false;
-    const na=a.toUpperCase().trim(), nb=b.toUpperCase().trim();
-    return na===nb||na.startsWith(nb)||nb.startsWith(na);
-  }
-
   // Filtrar por vendedor
   const pendsFiltradas=pends.filter(p=>{
     if(CFG.role==='gestor') return true;
     const c=clientes.find(x=>x.id===p.clienteId);
     const vendCliente=c?c.vendedor:'';
     const vendPendencia=p.vendedor||'';
-    return nomeMatch(vendCliente,CFG.nome)||nomeMatch(vendPendencia,CFG.nome);
+    if(CFG.role==='gerente'){
+      const grp=meuGrupo();
+      return grp.some(g=>nomeVendedor(vendCliente,g)||nomeVendedor(vendPendencia,g));
+    }
+    return nomeVendedor(vendCliente,CFG.nome)||nomeVendedor(vendPendencia,CFG.nome);
   });
   const ativas=pendsFiltradas.filter(p=>!p.revisado);
   if(badge) badge.textContent=ativas.length?ativas.length+' pendente'+(ativas.length>1?'s':''):'';
@@ -3858,6 +3857,14 @@ function fmtDate(d){ if(!d) return ''; try{ const [y,m,dd]=String(d).split('-');
 function uid(){ return Math.random().toString(36).slice(2,9)+Date.now().toString(36); }
 function initials(nome){ return (nome||'').split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase(); }
 function normalize(s){ return (s||'').toUpperCase().replace(/[^A-Z0-9]/g,''); }
+// Fuzzy vendor name match: exact, startsWith (bidirectional), or first-token match (≥3 chars)
+function nomeVendedor(a,b){
+  if(!a||!b) return false;
+  const na=a.toUpperCase().trim(), nb=b.toUpperCase().trim();
+  if(na===nb||na.startsWith(nb)||nb.startsWith(na)) return true;
+  const fa=na.split(' ')[0], fb=nb.split(' ')[0];
+  return fa.length>=3&&fa===fb;
+}
 </script>
 <!-- Firebase carregado dinamicamente -->
 <script>
