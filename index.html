@@ -9,18 +9,7 @@
 <title>CRM</title>
 <script>
 const build='16.1';
-(function(){
-  const url=new URL(window.location.href);
-  const stored=localStorage.getItem('crm_build');
-  if(stored!==build){
-    localStorage.setItem('crm_build',build);
-    if(!url.searchParams.get('v')){
-      url.searchParams.set('v',build);
-      window.location.replace(url.toString());
-    }
-  }
-})();
-</script>
+
 <!-- Firebase carrega no final do body -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
