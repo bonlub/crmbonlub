@@ -544,6 +544,15 @@ tbody tr:hover td{background:var(--surface2);}
         </div>
 
         <div style="background:var(--surface);border:0.5px solid var(--border);border-radius:var(--radius-lg);padding:1.25rem">
+          <div style="font-size:13px;font-weight:600;margin-bottom:.5rem">⚡ Reativar todos os clientes inativos</div>
+          <p style="font-size:12px;color:var(--text2);margin-bottom:10px;line-height:1.6">
+            Altera o status de todos os clientes <strong>CLIENTE INATIVO</strong> para <strong>CLIENTE ATIVO</strong> de uma vez.
+          </p>
+          <button class="btn-primary" style="width:100%;background:#D97706;border-color:#B45309" onclick="reativarTodosClientes()">⚡ Reativar todos os inativos</button>
+          <div id="reativar-status" style="margin-top:8px;font-size:12px"></div>
+        </div>
+
+        <div style="background:var(--surface);border:0.5px solid var(--border);border-radius:var(--radius-lg);padding:1.25rem">
           <div style="font-size:13px;font-weight:600;margin-bottom:.5rem">🚀 Publicar atualização</div>
           <p style="font-size:12px;color:var(--text2);margin-bottom:10px;line-height:1.6">
             Após subir uma nova versão no GitHub, clique aqui para sinalizar a atualização. Todos os usuários conectados serão desconectados automaticamente e redirecionados para a versão nova na próxima sincronização (até 1 minuto).
@@ -2994,6 +3003,25 @@ function salvarConfig(){
   toast('Configurações salvas!','ok');
 }
 
+function reativarTodosClientes(){
+  confirmar('Reativar TODOS os clientes inativos?\n\nEsta ação irá alterar o status de todos os clientes INATIVO para ATIVO.', ()=>{
+    let count=0;
+    clientes.forEach(c=>{
+      if(c.status==='CLIENTE INATIVO'){
+        c.status='CLIENTE ATIVO';
+        c.reativacoes=(c.reativacoes||0)+1;
+        count++;
+      }
+    });
+    saveLocal(); syncRemote();
+    registrarLog('cliente','Reativação em massa',`${count} clientes reativados`);
+    const st=document.getElementById('reativar-status');
+    if(st) st.innerHTML=`<span style="color:var(--g-text)">✓ ${count} clientes reativados!</span>`;
+    toast(`${count} clientes reativados!`,'ok');
+    renderClientes(); renderDashboard();
+  });
+}
+
 async function publicarAtualizacao(){
   const btn=event.target;
   btn.disabled=true; btn.textContent='⏳ Publicando...';
@@ -3360,14 +3388,7 @@ function tentarConciliar(){
     .filter(v=>{
       if(!mapaVd[v.nf]) return false; // cancelada
       const vendNome=mapaVd[v.nf].vendedor||'';
-      if(!vendNome) return false; // sem vendedor identificado
-      // Verificar se vendedor existe no CRM (match parcial por primeiro nome)
-      const u=usuarios.find(x=>{
-        const n=x.nome.toUpperCase();
-        const vn=vendNome.toUpperCase();
-        return n===vn||n.startsWith(vn)||vn.startsWith(n);
-      });
-      if(!u){ console.log(`Symplex: NF ${v.nf} ignorada — vendedor "${vendNome}" não cadastrado no CRM`); return false; }
+      if(!vendNome) return false; // sem vendedor identificado no relatório
       // Verificar se cliente foi anteriormente recusado
       const cnpjLimpo=v.cnpj.replace(/\D/g,'');
       const jaRecusado=recusados.some(p=>{
@@ -3580,13 +3601,14 @@ function processarSymplex(){
       // Criar novo cliente
       const cnpjFmt=venda.cnpj.length>11?venda.cnpj.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/,'$1.$2.$3/$4-$5'):venda.cnpj.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/,'$1.$2.$3-$4');
       const vendNome=venda.vendedor||'';
-      // Busca fuzzy: igual, começa com, ou contém
-      const u=usuarios.find(x=>{
+      // Busca fuzzy no CRM — se não encontrar, usa o nome bruto do relatório
+      const u=vendNome?usuarios.find(x=>{
         const n=x.nome.toUpperCase();
-        const v=vendNome.toUpperCase();
-        return n===v||n.startsWith(v)||v.startsWith(n)||n.includes(v)||v.includes(n);
-      });
-      const vendedorFinal=u?u.nome:vendNome;
+        const vv=vendNome.toUpperCase();
+        return n===vv||n.startsWith(vv)||vv.startsWith(n)||n.includes(vv)||vv.includes(n);
+      }):null;
+      const vendedorFinal=u?u.nome:vendNome; // sempre preenche, mesmo sem match no CRM
+      console.log(`[Symplex novo] ${venda.razaoSocial} | vendNome=${vendNome} | crmMatch=${u?u.nome:'NÃO'} | final=${vendedorFinal}`);
       const novoCliente={
         id:uid(),codCliente:venda.codSymplex,razaoSocial:venda.razaoSocial,nomeFantasia:'',
         cnpj:cnpjFmt,ie:'',whatsapp:'',tel:'',tel2:'',tel3:'',email:'',email2:'',
