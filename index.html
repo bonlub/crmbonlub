@@ -8,7 +8,7 @@
 <meta http-equiv="Expires" content="0">
 <title>CRM</title>
 <script>
-const build='16';
+const build='16.1';
 (function(){
   const url=new URL(window.location.href);
   const stored=localStorage.getItem('crm_build');
@@ -274,7 +274,7 @@ tbody tr:hover td{background:var(--surface2);}
 <!-- LOGIN -->
 <div id="login-screen">
   <div class="login-card">
-    <div class="login-logo">CRM <span style="font-size:12px;font-weight:400;color:var(--text3)">v16.0</span></div>
+    <div class="login-logo">CRM <span style="font-size:12px;font-weight:400;color:var(--text3)">v16.1</span></div>
     <div class="login-sub">Acesse sua conta</div>
     <label>Usuário</label>
     <input id="lg-user" placeholder="Seu nome" style="text-transform:none" oninput="this.value=this.value.replace(/[^a-zA-Z\s]/g,'')">
@@ -289,7 +289,7 @@ tbody tr:hover td{background:var(--surface2);}
 <div id="app">
   <div class="topbar">
     <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-      <span class="topbar-logo">CRM <span style="font-size:10px;font-weight:400;color:var(--text3)">v16.0</span></span>
+      <span class="topbar-logo">CRM <span style="font-size:10px;font-weight:400;color:var(--text3)">v16.1</span></span>
       <nav class="nav">
         <button class="nav-btn active" onclick="nav('funil',this)">Funil</button>
         <button class="nav-btn" onclick="nav('tarefas',this)" id="btn-nav-tarefas">Tarefas<span class="nav-badge" id="badge-tarefas" style="display:none">0</span></button>
@@ -1614,7 +1614,9 @@ function atualizarBadgeSymplex(){
     if(p.revisado) return false;
     if(CFG.role==='gestor') return true;
     const c=clientes.find(x=>x.id===p.clienteId);
-    return c&&c.vendedor===CFG.nome;
+    const vendCliente=c?c.vendedor:'';
+    const vendPendencia=p.vendedor||'';
+    return vendCliente===CFG.nome||vendPendencia===CFG.nome;
   });
   const badge=document.getElementById('badge-symplex');
   if(!badge) return;
@@ -3589,27 +3591,33 @@ function processarSymplex(){
           });
         }
       });
-      pendencias.push({clienteId:c.id,tipo:'atualizado',razaoSocial:c.razaoSocial,nfs:nfs.map(n=>n.nf).join(', '),vendedorDiferente,divergencias:entry.venda.divergencias||[],camposFaltando:entry.venda.camposFaltando||[]});
+      pendencias.push({clienteId:c.id,tipo:'atualizado',razaoSocial:c.razaoSocial,nfs:nfs.map(n=>n.nf).join(', '),vendedor:c.vendedor||nomeSymplex,vendedorDiferente,divergencias:entry.venda.divergencias||[],camposFaltando:entry.venda.camposFaltando||[]});
       atualizados++;
     } else {
       // Criar novo cliente
       const cnpjFmt=venda.cnpj.length>11?venda.cnpj.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/,'$1.$2.$3/$4-$5'):venda.cnpj.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/,'$1.$2.$3-$4');
-      const vendNome=venda.vendedor;
-      const u=usuarios.find(x=>x.nome===vendNome||x.nome.includes(vendNome));
+      const vendNome=venda.vendedor||'';
+      // Busca fuzzy: igual, começa com, ou contém
+      const u=usuarios.find(x=>{
+        const n=x.nome.toUpperCase();
+        const v=vendNome.toUpperCase();
+        return n===v||n.startsWith(v)||v.startsWith(n)||n.includes(v)||v.includes(n);
+      });
+      const vendedorFinal=u?u.nome:vendNome;
       const novoCliente={
         id:uid(),codCliente:venda.codSymplex,razaoSocial:venda.razaoSocial,nomeFantasia:'',
         cnpj:cnpjFmt,ie:'',whatsapp:'',tel:'',tel2:'',tel3:'',email:'',email2:'',
         contato:'',cidade:venda.cidade||'',estado:venda.estado,transportadora:'',categoria:'',
-        status:'CLIENTE ATIVO',obs:'',vendedor:u?u.nome:'',dataVinculo:u?hoje():'',
+        status:'CLIENTE ATIVO',obs:'',vendedor:vendedorFinal,dataVinculo:vendedorFinal?hoje():'',
         cadastradoPor:'SYMPLEX',global:true,reativacoes:0,obsHistorico:[],
         valorPotencial:valorTotal,comprasHistorico:[],symplexPendente:true
       };
       adicionarHistoricoCompras(novoCliente,nfs,produtos);
       clientes.push(novoCliente);
       nfs.forEach(nfObj=>{
-        deals.push({id:uid(),clienteId:novoCliente.id,valor:nfObj.valor,etapa:'ganho',vendedor:novoCliente.vendedor||CFG.nome,data:nfObj.data||hoje(),obs:'IMPORTADO DO SYMPLEX',motivo:'',numOrcamento:nfObj.nf,historico:[{etapa:'ganho',data:nfObj.data||hoje(),obs:'SYMPLEX',autor:'SISTEMA'}]});
+        deals.push({id:uid(),clienteId:novoCliente.id,valor:nfObj.valor,etapa:'ganho',vendedor:vendedorFinal||CFG.nome,data:nfObj.data||hoje(),obs:'IMPORTADO DO SYMPLEX',motivo:'',numOrcamento:nfObj.nf,historico:[{etapa:'ganho',data:nfObj.data||hoje(),obs:'SYMPLEX',autor:'SISTEMA'}]});
       });
-      pendencias.push({clienteId:novoCliente.id,tipo:'novo',razaoSocial:novoCliente.razaoSocial,cnpj:novoCliente.cnpj.replace(/\D/g,''),nfs:nfs.map(n=>n.nf).join(', ')});
+      pendencias.push({clienteId:novoCliente.id,tipo:'novo',razaoSocial:novoCliente.razaoSocial,cnpj:novoCliente.cnpj.replace(/\D/g,''),nfs:nfs.map(n=>n.nf).join(', '),vendedor:vendedorFinal});
       criados++;
     }
   });
@@ -3665,8 +3673,10 @@ function renderPendencias(){
   const pendsFiltradas=pends.filter(p=>{
     if(CFG.role==='gestor') return true;
     const c=clientes.find(x=>x.id===p.clienteId);
-    if(!c) return false;
-    return c.vendedor===CFG.nome;
+    // Verificar pelo vendedor do cliente OU pelo vendedor salvo na pendência
+    const vendCliente=c?c.vendedor:'';
+    const vendPendencia=p.vendedor||'';
+    return vendCliente===CFG.nome||vendPendencia===CFG.nome;
   });
   const ativas=pendsFiltradas.filter(p=>!p.revisado);
   if(badge) badge.textContent=ativas.length?ativas.length+' pendente'+(ativas.length>1?'s':''):'';
