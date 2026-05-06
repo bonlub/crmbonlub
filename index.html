@@ -788,6 +788,12 @@ function iniciarApp(){
     // Notificação de tarefas ao logar (somente vendedor e gerente)
     if(CFG.role!=='gestor') setTimeout(()=>notificarTarefasLogin(),800);
   });
+  // Sincronização automática a cada 1 minuto
+  setInterval(()=>{
+    carregarDoFirebase().then(carregou=>{
+      if(carregou){ renderAll(); atualizarBadgeTarefas(); atualizarBadgeSymplex(); }
+    });
+  },60000);
 }
 
 function notificarTarefasLogin(){
