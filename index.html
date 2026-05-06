@@ -298,7 +298,7 @@ tbody tr:hover td{background:var(--surface2);}
         <button class="nav-btn" onclick="nav('dashboard',this)">Dashboard</button>
         <button class="nav-btn" id="btn-nav-vendors" style="display:none" onclick="nav('vendedores',this)">Equipe</button>
         <button class="nav-btn" id="btn-nav-importar" style="display:none" onclick="nav('importar',this)">Importar</button>
-        <button class="nav-btn" id="btn-nav-symplex" style="display:none" onclick="nav('symplex',this)">🔗 Symplex</button>
+        <button class="nav-btn" id="btn-nav-symplex" style="display:none" onclick="nav('symplex',this)">🔗 Symplex<span class="nav-badge" id="badge-symplex" style="display:none">0</span></button>
         <button class="nav-btn" id="btn-nav-relatorio" style="display:none" onclick="nav('relatorio',this)">Relatório</button>
         <button class="nav-btn" id="btn-nav-config" style="display:none" onclick="nav('config',this)">⚙ Config</button>
         <button class="nav-btn" id="btn-nav-log" style="display:none" onclick="nav('log',this)">📋 Log</button>
@@ -598,7 +598,7 @@ tbody tr:hover td{background:var(--surface2);}
             <strong id="dof-label">Clique ou arraste</strong>
             <span style="font-size:11px"> relEmissaoDOF.xlsx</span>
           </div>
-          <input type="file" id="dof-in" accept=".xlsx,.xls" style="display:none" onchange="carregarDof(this.files[0])">
+          <input type="file" id="dof-in" accept=".xlsx,.xls" style="display:none">
         </div>
         <div style="background:var(--surface);border:0.5px solid var(--border);border-radius:var(--radius-lg);padding:1.25rem">
           <div style="font-size:13px;font-weight:600;margin-bottom:.5rem">2. relVendasDiaria <span style="font-size:10px;color:var(--text3)">(vendedores + NFs)</span></div>
@@ -608,7 +608,7 @@ tbody tr:hover td{background:var(--surface2);}
             <strong id="vd-label">Clique ou arraste</strong>
             <span style="font-size:11px"> relVendasDiaria.xlsx</span>
           </div>
-          <input type="file" id="vd-in" accept=".xlsx,.xls" style="display:none" onchange="carregarVd(this.files[0])">
+          <input type="file" id="vd-in" accept=".xlsx,.xls" style="display:none">
         </div>
       </div>
 
@@ -642,7 +642,7 @@ tbody tr:hover td{background:var(--surface2);}
           ondragleave="this.classList.remove('drag')" ondrop="handleDrop(event)">
           <strong>Clique aqui ou arraste o arquivo</strong>.xlsx, .xls ou .csv
         </div>
-        <input type="file" id="file-in" accept=".xlsx,.xls,.csv" style="display:none" onchange="handleFile(this.files[0])">
+        <input type="file" id="file-in" accept=".xlsx,.xls,.csv" style="display:none">
         <div id="import-body"></div>
         <div id="import-result" style="display:none;margin-top:1rem;padding:12px 14px;border-radius:var(--radius);font-size:13px;background:var(--g-bg);color:var(--g-text)"></div>
       </div>
@@ -1035,7 +1035,7 @@ function nav(name,btn){
   btn.classList.add('active');
   renderAll();
 }
-function renderAll(){ limparDadosDeOutrosVendedores(); renderFunil(); renderTarefas(); renderClientes(); renderDashboard(); renderVendedores(); populaFiltros(); atualizarBadgeTarefas(); renderConfig(); renderLog(); renderPendencias(); renderOportunidades(); }
+function renderAll(){ limparDadosDeOutrosVendedores(); renderFunil(); renderTarefas(); renderClientes(); renderDashboard(); renderVendedores(); populaFiltros(); atualizarBadgeTarefas(); atualizarBadgeSymplex(); renderConfig(); renderLog(); renderPendencias(); renderOportunidades(); }
 
 // ══════════════════════════════════════════════════════════
 //  NOTIFICAÇÃO TAREFAS VENCIDAS
@@ -1539,6 +1539,21 @@ function acSelecionar(id,nome){
 // ══════════════════════════════════════════════════════════
 //  TAREFAS
 // ══════════════════════════════════════════════════════════
+function atualizarBadgeSymplex(){
+  const pends=CONFIG.symplexPendencias||[];
+  // Filtrar por vendedor se não for gestor
+  const ativas=pends.filter(p=>{
+    if(p.revisado) return false;
+    if(CFG.role==='gestor') return true;
+    const c=clientes.find(x=>x.id===p.clienteId);
+    return c&&(c.vendedor===CFG.nome||(!c.vendedor&&p.tipo==='novo'));
+  });
+  const badge=document.getElementById('badge-symplex');
+  if(!badge) return;
+  if(ativas.length>0){ badge.textContent=ativas.length>99?'99+':ativas.length; badge.style.display=''; }
+  else badge.style.display='none';
+}
+
 function atualizarBadgeTarefas(){
   const pendentes=tarefas.filter(t=>{
     if(t.status==='finalizada') return false;
@@ -2380,6 +2395,15 @@ function handleFile(file){
   r.onload=e=>{ const wb=XLSX.read(e.target.result,{type:'binary'}); const ws=wb.Sheets[wb.SheetNames[0]]; const rows=XLSX.utils.sheet_to_json(ws,{header:1}); importHeaders=rows[0]||[]; importData=rows.slice(1).filter(r=>r.some(c=>c)); mostrarMapeamento(); };
   r.readAsBinaryString(file);
 }
+// Registrar listeners de arquivo com delay para garantir DOM pronto
+setTimeout(()=>{
+  const fi=document.getElementById('file-in');
+  if(fi) fi.addEventListener('change',function(){ handleFile(this.files[0]); });
+  const di=document.getElementById('dof-in');
+  if(di) di.addEventListener('change',function(){ carregarDof(this.files[0]); });
+  const vi=document.getElementById('vd-in');
+  if(vi) vi.addEventListener('change',function(){ carregarVd(this.files[0]); });
+},500);
 const CMAP={'Cod. Cliente':'codCliente','Razão Social':'razaoSocial','Nome Fantasia':'nomeFantasia','CNPJ/CPF':'cnpj','WhatsApp':'whatsapp','Telefone':'tel','Telefone 2':'tel2','Telefone 3':'tel3','E-mail':'email','E-mail 2':'email2','Contato':'contato','Cidade':'cidade','Estado':'estado','Transportadora':'transportadora','Status':'status','Observações':'obs'};
 const CAMPOS_IMP=['(ignorar)',...Object.keys(CMAP)];
 function autoMapI(h){ h=h.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,''); if(/cod|codigo|client/.test(h)) return 'Cod. Cliente'; if(/razao|rs/.test(h)) return 'Razão Social'; if(/fantasia|nf/.test(h)) return 'Nome Fantasia'; if(/cnpj|cpf/.test(h)) return 'CNPJ/CPF'; if(/whats|zap/.test(h)) return 'WhatsApp'; if(/tel3|fone3/.test(h)) return 'Telefone 3'; if(/tel2|fone2/.test(h)) return 'Telefone 2'; if(/tel|fone|celular/.test(h)) return 'Telefone'; if(/email2|mail2/.test(h)) return 'E-mail 2'; if(/email|mail/.test(h)) return 'E-mail'; if(/contato|responsavel/.test(h)) return 'Contato'; if(/cidade/.test(h)) return 'Cidade'; if(/estado|uf/.test(h)) return 'Estado'; if(/transp/.test(h)) return 'Transportadora'; if(/status/.test(h)) return 'Status'; if(/obs|nota/.test(h)) return 'Observações'; return '(ignorar)'; }
@@ -2554,16 +2578,32 @@ ${tarefasCliente.slice(0,3).map(t=>`[${t.data}] ${t.status.toUpperCase()}: ${t.o
   return ctx;
 }
 
-// Cache IA: clienteId -> {resposta, ts}
+// Cache IA: persistido no localStorage com TTL 24h
 const _aiCache={};
+function aiCacheGet(clienteId){
+  try{
+    const raw=localStorage.getItem('crm_ai_'+clienteId);
+    if(!raw) return null;
+    const obj=JSON.parse(raw);
+    if(Date.now()-obj.ts>86400000){ localStorage.removeItem('crm_ai_'+clienteId); return null; }
+    return obj;
+  }catch(e){ return null; }
+}
+function aiCacheSet(clienteId,resposta){
+  try{
+    const obj={resposta,ts:Date.now()};
+    _aiCache[clienteId]=obj;
+    localStorage.setItem('crm_ai_'+clienteId,JSON.stringify(obj));
+  }catch(e){}
+}
 
 async function sugestaoIA(clienteId, tarefaId){
   if(!CONFIG.aiKey){ toast('Configure a chave de API da IA em Config.','warn'); return; }
   const btn=document.getElementById(`ai-btn-${tarefaId}`);
   const c=clientes.find(x=>x.id===clienteId);
 
-  // Verificar cache 24h
-  const cache=_aiCache[clienteId];
+  // Verificar cache 24h (localStorage)
+  const cache=aiCacheGet(clienteId)||_aiCache[clienteId];
   const agora=Date.now();
   if(cache&&(agora-cache.ts)<86400000){
     // Mostrar resposta em cache sem nova consulta
@@ -2601,8 +2641,8 @@ Seja direto, prático e use linguagem comercial brasileira.`}]
     const d=await r.json();
     const resposta=d.content?.[0]?.text||'Não foi possível obter sugestão.';
 
-    // Salvar no cache 24h (NÃO salvar no histórico do cliente)
-    _aiCache[clienteId]={resposta,ts:Date.now()};
+    // Salvar no cache 24h localStorage (NÃO salvar no histórico do cliente)
+    aiCacheSet(clienteId,resposta);
     window._ultimaResposta=resposta;
 
     modal(`<h3>🤖 Sugestão IA — ${esc(c?.razaoSocial||'')}</h3>
@@ -3019,58 +3059,66 @@ function carregarVd(file){
 
 // ── Parser relEmissaoDOF ─────────────────────────────────
 function parseDof(rows){
+  // Estrutura real:
+  // L4: [null, "1172 - RAZAO | CNPJ: xxx | ENDER.: xxx | CIDADE: 5123 - MS", ...]
+  // L5: ["Emissão:", null, null, DATE, "Saída:", null, "NFE/49468", ...]
+  // L6: [null, "Produto", ...]  (header produtos)
+  // L7+: [null, "00570001 - DESCRICAO", ...]  (produtos)
+  // L8: [null, N, "produto(s)", null, ..., "Total:", null, ..., VALOR]  col[16]=valor
   const vendas=[];
   let clienteAtual=null, nfAtual=null, dataAtual=null, produtos=[];
 
   for(let i=0;i<rows.length;i++){
     const row=rows[i];
-    const col1=String(row[0]||'').trim();
-    const col2=String(row[1]||'').trim();
+    const col1=String(row[1]||'').trim();
+    const col0=String(row[0]||'').trim();
 
-    // Linha de cliente: começa com "NÚMERO - RAZAO SOCIAL | CNPJ..."
-    if(col2.match(/^\d+\s*-\s*.+\|.*CNPJ/i)||col2.match(/^\d+\s*-\s*.+\|.*CPF/i)){
-      // Salvar venda anterior se existir
+    // Linha de cliente: col1 começa com "NNNN - RAZAO SOCIAL | CNPJ:..."
+    if(col1.match(/^\d+\s*-\s*.+\|\s*CNPJ:/i)||col1.match(/^\d+\s*-\s*.+\|\s*CPF:/i)){
+      // Salvar venda anterior
       if(clienteAtual&&nfAtual){
         vendas.push({...clienteAtual,nf:nfAtual,data:dataAtual,produtos:[...produtos]});
       }
-      clienteAtual=parseDofCliente(col2);
+      clienteAtual=parseDofCliente(col1);
       nfAtual=null; dataAtual=null; produtos=[];
       continue;
     }
 
-    // Linha de NF: col1 = "Emissão:" e col7 contém "NFE/xxxxx"
-    if(col1==='Emissão:'||col1==='Emissao:'){
-      for(let c=0;c<row.length;c++){
-        const v=String(row[c]||'').trim();
-        if(v.match(/NFE\/\d+/i)){
-          nfAtual=v.replace('NFE/','').replace('NF-e/','').trim();
-        }
-        if(row[3]&&String(row[3]).match(/\d{4}-\d{2}-\d{2}/)){
-          dataAtual=String(row[3]).slice(0,10);
+    // Linha de NF: col0='Emissão:', col6='NFE/XXXXX'
+    if(col0==='Emissão:'||col0==='Emissao:'){
+      const col6=String(row[6]||'').trim();
+      if(col6.match(/NFE\/\d+/i)){
+        nfAtual=col6.replace(/NFE\//i,'').trim();
+      }
+      // Data está na col3
+      if(row[3]){
+        const d=row[3];
+        if(typeof d==='string'&&d.match(/\d{4}-\d{2}-\d{2}/)){
+          dataAtual=d.slice(0,10);
+        } else if(d instanceof Date||typeof d==='object'){
+          try{
+            const dt=new Date(d);
+            dataAtual=dt.toISOString().slice(0,10);
+          }catch(e){}
         }
       }
       continue;
     }
 
-    // Linha de total da NF
-    if(col2==='Total:'||String(row[9]||'').trim()==='Total:'){
-      // Salvar com valor total
-      const totalIdx=row.findIndex(v=>String(v||'').trim()==='Total:');
-      if(totalIdx>=0&&clienteAtual&&nfAtual){
-        const totalVal=parseFloat(String(row[totalIdx+5]||row[16]||0).replace(',','.').replace(/[^\d.]/g,''))||0;
-        clienteAtual.valorTotal=totalVal;
-      }
-      continue;
-    }
-
-    // Linha de produto: col2 começa com código numérico "00XXXXXX - DESCRICAO"
-    if(col2.match(/^\d{8}\s*-\s+.+/)){
-      const partes=col2.split(' - ');
+    // Linha de produto: col1 começa com código "00XXXXXX - DESCRICAO"
+    if(col1.match(/^\d{8}\s*-\s+.+/)){
+      const partes=col1.split(' - ');
       const codProd=partes[0].trim();
       const descProd=partes.slice(1).join(' - ').trim();
-      const qtd=parseFloat(String(row[12]||0).replace(',','.'))||0;
-      const valor=parseFloat(String(row[17]||0).replace(',','.'))||0;
-      produtos.push({codigo:codProd,descricao:descProd,qtd,valor});
+      produtos.push({codigo:codProd,descricao:descProd,qtd:0,valor:0});
+      continue;
+    }
+
+    // Linha de total: col9='Total:' -> col16=valor total
+    if(String(row[9]||'').trim()==='Total:'){
+      const valorRaw=row[16];
+      const valor=parseFloat(String(valorRaw||0).replace(',','.'))||0;
+      if(clienteAtual) clienteAtual.valorTotal=valor;
       continue;
     }
   }
@@ -3111,28 +3159,25 @@ function parseDofCliente(str){
 
 // ── Parser relVendasDiaria ───────────────────────────────
 function parseVd(rows){
+  // Estrutura real:
+  // L4: header (col0=Doc, col3=Número, col5=Terceiro, col17=Vendedor, col21=Total nota)
+  // L5+: date rows  "2026-05-02 00:00:00"
+  // L6+: NFE rows   col0=NFE, col3=NF, col5=codCli, col8=nomeCli, col17=codVend, col18=nomeVend, col21=total
+  // L16: totals row col0=number, col2=VENDAS...
   const mapa={}; // nf -> {vendedor, codCliente, razao, valor}
-  let vendedorAtual='';
 
   for(let i=0;i<rows.length;i++){
     const row=rows[i];
-    const col1=String(row[0]||'').trim();
+    const col0=String(row[0]||'').trim();
 
-    // Linha de vendedor: "CODIGO - NOME" sem NF
-    if(col1.match(/^\d+\s*-\s+[A-Z]/i)&&String(row[4]||'').trim()===''){
-      vendedorAtual=col1.replace(/^\d+\s*-\s*/,'').trim().toUpperCase();
-      continue;
-    }
-
-    // Linha de NF: col1='NFE', col5=numero, col18=cod_cliente, col19=razao, col25=valor total nota
-    if(col1==='NFE'||col1==='NF-E'){
-      const nfNum=String(row[4]||'').trim();
-      const codCliente=String(row[17]||'').trim();
-      const razao=String(row[18]||'').trim().toUpperCase();
-      // col25 = Total nota (índice 24)
-      const valorTotal=parseFloat(String(row[24]||0).replace(',','.'))||0;
-      if(nfNum) mapa[nfNum]={vendedor:vendedorAtual,codCliente,razao,valor:valorTotal};
-      continue;
+    // Linha NFE
+    if(col0==='NFE'||col0==='NF-E'){
+      const nfNum=String(row[3]||'').trim();
+      const codCliente=String(row[5]||'').trim();
+      const razao=String(row[8]||'').trim().toUpperCase();
+      const nomeVend=String(row[18]||'').trim().toUpperCase();
+      const valorTotal=parseFloat(String(row[21]||0).replace(',','.'))||0;
+      if(nfNum) mapa[nfNum]={vendedor:nomeVend,codCliente,razao,valor:valorTotal};
     }
   }
 
@@ -3153,8 +3198,12 @@ function tentarConciliar(){
       if(!mapaVd[v.nf]) return false; // cancelada
       const vendNome=mapaVd[v.nf].vendedor||'';
       if(!vendNome) return false; // sem vendedor identificado
-      // Verificar se vendedor existe no CRM
-      const u=usuarios.find(x=>x.nome===vendNome||x.nome.includes(vendNome)||vendNome.includes(x.nome));
+      // Verificar se vendedor existe no CRM (match parcial por primeiro nome)
+      const u=usuarios.find(x=>{
+        const n=x.nome.toUpperCase();
+        const v=vendNome.toUpperCase();
+        return n===v||n.startsWith(v)||v.startsWith(n);
+      });
       if(!u){ console.log(`Symplex: NF ${v.nf} ignorada — vendedor "${vendNome}" não cadastrado no CRM`); return false; }
       return true;
     })
@@ -3312,8 +3361,13 @@ function processarSymplex(){
       if(!c.estado&&venda.estado) c.estado=venda.estado;
 
       // FIX 2: Verificar se vendedor do Symplex é diferente do CRM
-      const vendedorSymplex=venda.vendedor;
-      const uSymplex=usuarios.find(x=>x.nome===vendedorSymplex||x.nome.includes(vendedorSymplex));
+      const vendedorSymplex=venda.vendedor; // nome do VD (pode ser só primeiro nome)
+      // Buscar usuário no CRM por nome completo ou parcial
+      const uSymplex=usuarios.find(x=>{
+        const n=x.nome.toUpperCase();
+        const v=vendedorSymplex.toUpperCase();
+        return n===v||n.startsWith(v)||v.startsWith(n)||n.includes(v)||v.includes(n);
+      });
       const nomeSymplex=uSymplex?uSymplex.nome:vendedorSymplex;
       const vendedorDiferente=c.vendedor&&nomeSymplex&&c.vendedor!==nomeSymplex;
 
@@ -3387,7 +3441,7 @@ function processarSymplex(){
   document.getElementById('vd-zone').style.background='';
 
   toast(`Symplex: ${criados} clientes criados, ${atualizados} atualizados!`,'ok');
-  renderPendencias(); renderClientes(); renderDashboard();
+  renderPendencias(); renderClientes(); renderDashboard(); atualizarBadgeSymplex();
 }
 
 function adicionarHistoricoCompras(cliente, nfs, produtos){
@@ -3496,7 +3550,7 @@ function recusarCadastroSymplex(clienteId){
     saveLocal(); syncRemote();
     registrarLog('cliente','Cadastro Symplex recusado',`ID: ${clienteId}`);
     toast('Cadastro recusado. Vendas mantidas.','ok');
-    renderPendencias(); renderClientes();
+    renderPendencias(); renderClientes(); atualizarBadgeSymplex();
   });
 }
 
@@ -3505,7 +3559,7 @@ function marcarRevisado(clienteId){
   const p=CONFIG.symplexPendencias.find(x=>x.clienteId===clienteId);
   if(p) p.revisado=true;
   localStorage.setItem('crm7_config',JSON.stringify(CONFIG));
-  renderPendencias();
+  renderPendencias(); atualizarBadgeSymplex();
 }
 
 // ── Exibir histórico de compras no modal de dados do cliente ─
