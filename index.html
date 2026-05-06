@@ -993,16 +993,6 @@ async function carregarDoFirebase(){
     const doc=await ref.get({ source: 'server' });
     if(doc.exists){
       const d=doc.data();
-      // Verificar se há versão mais nova publicada pelo gestor
-      if(d.appBuild&&d.appBuild!==build){
-        console.log(`Nova versão detectada: ${d.appBuild} (local: ${build}). Recarregando...`);
-        // Limpar sessão local e forçar reload sem cache
-        localStorage.removeItem('crm6_session');
-        const url=new URL(window.location.href);
-        url.searchParams.set('v',d.appBuild);
-        window.location.replace(url.toString());
-        return false;
-      }
       if(d.usuarios){ usuarios=JSON.parse(d.usuarios); vendedores=usuarios.filter(u=>u.role!=='gestor'); }
       if(d.clientes){ clientes=JSON.parse(d.clientes); }
       if(d.deals){ deals=JSON.parse(d.deals); }
@@ -3936,12 +3926,6 @@ function carregarFirebase(){
     ]);
     if(doc.exists){
       const d=doc.data();
-      if(d.appBuild&&d.appBuild!==build){
-        const url=new URL(window.location.href);
-        url.searchParams.set('v',d.appBuild);
-        window.location.replace(url.toString());
-        return;
-      }
       if(d.usuarios){ usuarios=JSON.parse(d.usuarios); vendedores=usuarios.filter(u=>u.role!=='gestor'); }
       if(d.clientes){ clientes=JSON.parse(d.clientes); }
       if(d.deals){ deals=JSON.parse(d.deals); }
