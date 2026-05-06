@@ -978,11 +978,13 @@ async function syncRemote(){
       clientes:JSON.stringify(clientes),
       usuarios:JSON.stringify(usuarios),
       tarefas:JSON.stringify(tarefas),
-      config:JSON.stringify(CONFIG),
       updatedAt:new Date().toISOString()
     };
-    // Gestor sempre publica o build atual
-    if(CFG.role==='gestor') payload.appBuild=build;
+    // Apenas gestor salva CONFIG e build — vendedor/gerente não podem sobrescrever configurações
+    if(CFG.role==='gestor'){
+      payload.config=JSON.stringify(CONFIG);
+      payload.appBuild=build;
+    }
     await ref.set(payload,{merge:true});
   }catch(e){ console.log('Firebase sync error:',e); }
 }
@@ -3322,10 +3324,12 @@ function parseDof(rows){
 
     // Linha de produto: col1 começa com código "00XXXXXX - DESCRICAO"
     if(col1.match(/^\d{8}\s*-\s+.+/)){
-      const partes=col1.split(' - ');
-      const codProd=partes[0].trim();
-      const descProd=partes.slice(1).join(' - ').trim();
-      produtos.push({codigo:codProd,descricao:descProd,qtd:0,valor:0});
+      // Separar apenas o código (primeiros 8 dígitos) do restante
+      const codProd=col1.substring(0,8).trim();
+      const descProd=col1.replace(/^\d{8}\s*-\s*/,'').trim(); // tudo após "XXXXXXXX - "
+      const qtd=parseFloat(String(row[12]||0).replace(',','.'))||0;
+      const valor=parseFloat(String(row[17]||0).replace(',','.'))||0;
+      produtos.push({codigo:codProd,descricao:descProd,qtd,valor});
       continue;
     }
 
@@ -3687,10 +3691,12 @@ function adicionarHistoricoCompras(cliente, nfs, produtos){
   nfs.forEach(nfObj=>{
     const jaExiste=cliente.comprasHistorico.find(x=>x.nf===nfObj.nf);
     if(!jaExiste){
-      const produtosNf=produtos.filter(p=>p.valor>0);
-      cliente.comprasHistorico.push({nf:nfObj.nf,data:nfObj.data||hoje(),valor:nfObj.valor,produtos:produtosNf});
-      // Manter só últimas 50 compras
+      cliente.comprasHistorico.push({nf:nfObj.nf,data:nfObj.data||hoje(),valor:nfObj.valor,produtos:produtos.filter(p=>p.codigo)});
       if(cliente.comprasHistorico.length>50) cliente.comprasHistorico=cliente.comprasHistorico.slice(-50);
+    } else if(!jaExiste.produtos||!jaExiste.produtos.length){
+      // NF já existe mas sem produtos — atualizar
+      jaExiste.produtos=produtos.filter(p=>p.codigo);
+      if(nfObj.valor) jaExiste.valor=nfObj.valor;
     }
   });
 }
