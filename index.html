@@ -8,10 +8,10 @@
 <meta http-equiv="Expires" content="0">
 <title>CRM</title>
 <script>
+const build='16';
 (function(){
   const url=new URL(window.location.href);
   const stored=localStorage.getItem('crm_build');
-  const build='16';
   if(stored!==build){
     localStorage.setItem('crm_build',build);
     if(!url.searchParams.get('v')){
@@ -728,6 +728,8 @@ function fazerLogin(){
   const senha=document.getElementById('lg-pass').value;
   const u=usuarios.find(x=>x.nome===nome);
   if(!u||u.senha!==senha){ toast('Usuário ou senha incorretos.','err'); return; }
+  // Garantir CONFIG atualizado antes de verificar restrição
+  carregarConfig();
   // Verificar restrição de horário
   if(!verificarRestricaoHorario(u.role)){
     const r=CONFIG.restricaoHorario;
@@ -954,6 +956,7 @@ async function syncRemote(){
       clientes:JSON.stringify(clientes),
       usuarios:JSON.stringify(usuarios),
       tarefas:JSON.stringify(tarefas),
+      config:JSON.stringify(CONFIG),
       updatedAt:new Date().toISOString()
     };
     // Gestor sempre publica o build atual
@@ -978,11 +981,11 @@ async function carregarDoFirebase(){
         window.location.replace(url.toString());
         return false;
       }
+      if(d.usuarios){ usuarios=JSON.parse(d.usuarios); vendedores=usuarios.filter(u=>u.role!=='gestor'); }
       if(d.clientes){ clientes=JSON.parse(d.clientes); }
       if(d.deals){ deals=JSON.parse(d.deals); }
       if(d.tarefas){ tarefas=JSON.parse(d.tarefas); }
-      if(d.usuarios){ usuarios=JSON.parse(d.usuarios); vendedores=usuarios.filter(u=>u.role!=='gestor'); }
-      // Limpar caracteres especiais de CNPJ em todos os clientes existentes
+      if(d.config){ CONFIG=Object.assign({},CONFIG,JSON.parse(d.config)); localStorage.setItem('crm7_config',JSON.stringify(CONFIG)); }
       clientes.forEach(c=>{ if(c.cnpj) c.cnpj=c.cnpj.replace(/\D/g,''); if(c.ie) c.ie=c.ie.replace(/\D/g,''); });
       limparDadosDeOutrosVendedores();
       saveLocal();
@@ -3002,6 +3005,7 @@ function salvarConfig(){
   CONFIG.diasInativo=di; CONFIG.diasVinculo=dv;
   localStorage.setItem('crm7_config',JSON.stringify(CONFIG));
   document.getElementById('cfg-dias-label').textContent=di;
+  syncRemote();
   toast('Configurações salvas!','ok');
 }
 
@@ -3026,6 +3030,7 @@ function salvarRestricaoHorario(){
   const roles=document.getElementById('cfg-hora-roles')?.value||'vendedor';
   CONFIG.restricaoHorario={ini,fim,roles};
   localStorage.setItem('crm7_config',JSON.stringify(CONFIG));
+  syncRemote();
   const st=document.getElementById('cfg-hora-status');
   if(st) st.innerHTML=ini&&fim?`<span style="color:var(--g-text)">✓ Restrição ativa: ${ini} às ${fim} para ${roles}</span>`:`<span style="color:var(--text3)">Sem restrição configurada.</span>`;
   toast('Restrição de horário salva!','ok');
@@ -3073,23 +3078,23 @@ function adicionarCategoria(){
   const inp=document.getElementById('cfg-nova-cat'); if(!inp||!inp.value.trim()) return;
   if(!CONFIG.categorias) CONFIG.categorias=[];
   CONFIG.categorias.push(inp.value.trim().toUpperCase()); inp.value='';
-  localStorage.setItem('crm7_config',JSON.stringify(CONFIG)); renderConfig();
+  localStorage.setItem('crm7_config',JSON.stringify(CONFIG)); syncRemote(); renderConfig();
 }
 
 function removerCategoria(i){
   CONFIG.categorias.splice(i,1);
-  localStorage.setItem('crm7_config',JSON.stringify(CONFIG)); renderConfig();
+  localStorage.setItem('crm7_config',JSON.stringify(CONFIG)); syncRemote(); renderConfig();
 }
 
 function adicionarFuncao(){
   const inp=document.getElementById('cfg-nova-funcao'); if(!inp||!inp.value.trim()) return;
   CONFIG.funcoes.push(inp.value.trim().toUpperCase()); inp.value='';
-  localStorage.setItem('crm7_config',JSON.stringify(CONFIG)); renderConfig();
+  localStorage.setItem('crm7_config',JSON.stringify(CONFIG)); syncRemote(); renderConfig();
 }
 
 function removerFuncao(i){
   CONFIG.funcoes.splice(i,1);
-  localStorage.setItem('crm7_config',JSON.stringify(CONFIG)); renderConfig();
+  localStorage.setItem('crm7_config',JSON.stringify(CONFIG)); syncRemote(); renderConfig();
 }
 
 function resetarDadosDemo(){
@@ -3860,6 +3865,12 @@ function carregarFirebase(){
       if(d.clientes){ clientes=JSON.parse(d.clientes); }
       if(d.deals){ deals=JSON.parse(d.deals); }
       if(d.tarefas){ tarefas=JSON.parse(d.tarefas); }
+      if(d.config){
+        const remoteConfig=JSON.parse(d.config);
+        // Mesclar com CONFIG local — Firebase tem prioridade para configurações do gestor
+        CONFIG=Object.assign({},CONFIG,remoteConfig);
+        localStorage.setItem('crm7_config',JSON.stringify(CONFIG));
+      }
       clientes.forEach(c=>{ if(c.cnpj) c.cnpj=c.cnpj.replace(/\D/g,''); if(c.ie) c.ie=c.ie.replace(/\D/g,''); });
       saveLocal();
       // Se já estava logado, atualizar tela com dados novos
