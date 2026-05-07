@@ -1,0 +1,54 @@
+{
+  "_comentario": "Preencha todos os campos antes de rodar o sync.py",
+
+  "sql": {
+    "server":   "SEU_SERVIDOR\\INSTANCIA",
+    "database": "NOME_DO_BANCO_SYMPLEX",
+    "user":     "usuario_sql",
+    "password": "senha_sql",
+    "driver":   "ODBC Driver 17 for SQL Server"
+  },
+
+  "firebase_credentials": "firebase-credentials.json",
+
+  "tabelas": {
+    "notas_fiscais":  "NotasFiscais",
+    "itens_nf":       "ItensNF",
+    "clientes":       "Clientes",
+    "vendedores":     "Vendedores",
+    "produtos":       "Produtos"
+  },
+
+  "colunas": {
+    "nf_numero":          "NumeroNF",
+    "nf_data":            "DataEmissao",
+    "nf_valor_total":     "ValorTotal",
+    "nf_status":          "Status",
+    "nf_status_emitida":  "EMITIDA",
+    "nf_cod_cliente":     "CodigoCliente",
+    "nf_cod_vendedor":    "CodigoVendedor",
+
+    "cli_codigo":         "CodigoCliente",
+    "cli_razao":          "RazaoSocial",
+    "cli_cnpj":           "CNPJ",
+    "cli_cidade":         "Cidade",
+    "cli_estado":         "Estado",
+    "cli_endereco":       "Endereco",
+
+    "vend_codigo":        "CodigoVendedor",
+    "vend_nome":          "NomeVendedor",
+
+    "item_nf_numero":     "NumeroNF",
+    "item_cod_produto":   "CodigoProduto",
+    "item_quantidade":    "Quantidade",
+    "item_valor_unit":    "ValorUnitario",
+    "item_valor_total":   "ValorTotal",
+
+    "prod_codigo":        "CodigoProduto",
+    "prod_descricao":     "DescricaoProduto"
+  },
+
+  "intervalo_minutos": 15,
+  "log_arquivo":       "sync.log",
+  "log_max_linhas":    5000
+}
