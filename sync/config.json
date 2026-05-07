@@ -22,9 +22,9 @@
   },
 
   "colunas_cidade": {
-    "_aviso": "Se a query falhar com 'column does not exist', rode '\\d cidade' no psql e corrija aqui.",
-    "nome": "cidadenome",
-    "uf":   "cidadeuf"
+    "_aviso": "cidade não tem coluna de UF — estado vem da tabela estado via cidade.estadocdg",
+    "cidade_nome":   "cidadenome",
+    "estado_sigla":  "estadosigla"
   },
 
   "historico_inicial": true,

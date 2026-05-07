@@ -35,7 +35,6 @@ with open(os.path.join(BASE_DIR, 'config.json'), encoding='utf-8') as f:
     CFG = json.load(f)
 
 SQL = CFG['sql']
-COL_CIDADE = CFG.get('colunas_cidade', {'nome': 'cidadenome', 'uf': 'cidadeuf'})
 
 # ── Logging ───────────────────────────────────────────────────────────────────
 
@@ -148,14 +147,13 @@ def conectar_sql():
 def buscar_nfs_novas(conn, desde):
     """
     NFs de saída emitidas após 'desde', não canceladas.
-    - saida: cabeçalho da NF (dados do cliente já desnormalizados)
-    - terceiro t: dados do cliente (whatsapp)
-    - terceiro tv: nome do vendedor (vendedorcdg → terceiro)
-    - cidade: nome e UF da cidade do cliente
+    - saida       : cabeçalho da NF (dados do cliente já desnormalizados)
+    - terceiro t  : dados do cliente (whatsapp)
+    - terceiro tv : nome do vendedor (vendedorcdg → terceiro)
+    - cidade      : nome da cidade (cidadenome)
+    - estado      : sigla da UF (estadosigla) — cidade não tem UF direta
     """
-    col_nome = COL_CIDADE['nome']
-    col_uf   = COL_CIDADE['uf']
-    sql = f"""
+    sql = """
         SELECT
             s.saidaeucdg,
             s.seriecdg,
@@ -171,8 +169,8 @@ def buscar_nfs_novas(conn, desde):
             COALESCE(s.terceirotel01, '')                AS cli_tel,
             COALESCE(s.terceirotel02, '')                AS cli_tel2,
             COALESCE(s.terceiroemail, '')                AS cli_email,
-            COALESCE(cid.{col_nome}, '')                 AS cli_cidade,
-            COALESCE(cid.{col_uf},   '')                 AS cli_estado,
+            COALESCE(cid.cidadenome, '')                 AS cli_cidade,
+            COALESCE(est.estadosigla, '')                AS cli_estado,
             COALESCE(tv.terceironome, '')                AS vend_nome
         FROM saida s
         INNER JOIN terceiro t   ON s.terceiroeucdg = t.terceiroeucdg
@@ -180,6 +178,7 @@ def buscar_nfs_novas(conn, desde):
         LEFT  JOIN terceiro tv  ON s.vendedoreucdg = tv.terceiroeucdg
                                AND s.vendedorcdg   = tv.terceirocdg
         LEFT  JOIN cidade cid   ON t.cidadecdg     = cid.cidadecdg
+        LEFT  JOIN estado est   ON cid.estadocdg   = est.estadocdg
         WHERE s.saidaemissao > %s
           AND (s.saidacancelastatus IS NULL OR s.saidacancelastatus = '')
         ORDER BY s.saidaemissao ASC
