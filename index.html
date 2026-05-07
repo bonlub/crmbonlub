@@ -1826,9 +1826,12 @@ function verDadosCliente(id){
       </div>`:''}
       ${c.comprasHistorico&&c.comprasHistorico.length?`<div class="frow full">
         <label>Histórico de compras Symplex (${c.comprasHistorico.length} NFs)</label>
-        <div style="max-height:220px;overflow-y:auto">
+        <input type="text" placeholder="🔍 Filtrar por NF ou produto..."
+          style="width:100%;box-sizing:border-box;padding:5px 8px;font-size:12px;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface);color:var(--text);margin-bottom:6px"
+          oninput="(v=>{const w=document.getElementById('hl-${id}');if(w)w.querySelectorAll('.hnf').forEach(el=>{el.style.display=v&&!el.dataset.s.toLowerCase().includes(v)?'none':''});})(this.value.toLowerCase().trim())">
+        <div id="hl-${id}" style="max-height:220px;overflow-y:auto">
           ${c.comprasHistorico.slice().reverse().map(nf=>`
-            <div style="padding:8px 10px;background:var(--surface2);border-radius:var(--radius);margin-bottom:5px;font-size:12px">
+            <div class="hnf" data-s="${esc(nf.nf+' '+(nf.produtos||[]).map(p=>p.descricao||'').join(' '))}" style="padding:8px 10px;background:var(--surface2);border-radius:var(--radius);margin-bottom:5px;font-size:12px">
               <div style="display:flex;justify-content:space-between;margin-bottom:3px">
                 <span style="font-weight:600;font-family:var(--mono)">NF ${esc(nf.nf)}</span>
                 <span style="font-family:var(--mono);color:var(--g-text);font-weight:600">${fmt(nf.valor)}</span>
