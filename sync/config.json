@@ -29,6 +29,10 @@
 
   "historico_inicial": true,
 
+  "modelos_nfe":  ["55"],
+  "modelos_nfce": ["65"],
+  "min_nfs_para_crm": 2,
+
   "intervalo_minutos": 15,
   "log_arquivo":       "sync.log",
   "log_max_linhas":    5000

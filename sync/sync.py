@@ -35,6 +35,9 @@ with open(os.path.join(BASE_DIR, 'config.json'), encoding='utf-8') as f:
     CFG = json.load(f)
 
 SQL = CFG['sql']
+MODELOS_NFE  = CFG.get('modelos_nfe',  ['55'])
+MODELOS_NFCE = CFG.get('modelos_nfce', ['65'])
+MIN_NFS      = CFG.get('min_nfs_para_crm', 2)
 
 # ── Logging ───────────────────────────────────────────────────────────────────
 
@@ -146,12 +149,8 @@ def conectar_sql():
 
 def buscar_nfs_novas(conn, desde):
     """
-    NFs de saída emitidas após 'desde', não canceladas.
-    - saida       : cabeçalho da NF (dados do cliente já desnormalizados)
-    - terceiro t  : dados do cliente (whatsapp)
-    - terceiro tv : nome do vendedor (vendedorcdg → terceiro)
-    - cidade      : nome da cidade (cidadenome)
-    - estado      : sigla da UF (estadosigla) — cidade não tem UF direta
+    NFs de saída MODELO NF-e emitidas após 'desde', não canceladas.
+    Filtro de modelo: config.modelos_nfe (padrão: ['55']).
     """
     sql = """
         SELECT
@@ -165,6 +164,8 @@ def buscar_nfs_novas(conn, desde):
             s.terceirocdg                                AS cli_cdg,
             COALESCE(s.terceironome, '')                 AS cli_razao,
             COALESCE(s.terceirodocumento, '')            AS cli_cnpj,
+            COALESCE(s.terceiroinsest, '')               AS cli_ie,
+            COALESCE(t.terceirnomefant, '')              AS cli_nomefant,
             COALESCE(t.terceirowhatsapp, '')             AS cli_whatsapp,
             COALESCE(s.terceirotel01, '')                AS cli_tel,
             COALESCE(s.terceirotel02, '')                AS cli_tel2,
@@ -180,11 +181,12 @@ def buscar_nfs_novas(conn, desde):
         LEFT  JOIN cidade cid   ON t.cidadecdg     = cid.cidadecdg
         LEFT  JOIN estado est   ON cid.estadocdg   = est.estadocdg
         WHERE s.saidaemissao > %s
+          AND s.saidamodelo = ANY(%s)
           AND (s.saidacancelastatus IS NULL OR s.saidacancelastatus = '')
         ORDER BY s.saidaemissao ASC
     """
     cursor = conn.cursor()
-    cursor.execute(sql, (desde,))
+    cursor.execute(sql, (desde, MODELOS_NFE))
     return cursor.fetchall()
 
 
@@ -221,6 +223,29 @@ def buscar_produtos_nf(conn, eucdg, seriecdg, saidanro):
         }
         for row in cursor.fetchall()
     ]
+
+
+def buscar_nfce_por_vendedor(conn, desde):
+    """
+    NF-Ce (modelo 65) agrupadas por vendedor desde 'desde'.
+    Não geram clientes/deals — apenas somam ao total vendido do vendedor.
+    """
+    sql = """
+        SELECT
+            COALESCE(tv.terceironome, 'SEM VENDEDOR') AS vend_nome,
+            SUM(s.saidatotal)                          AS total_nfce,
+            COUNT(*)                                   AS qtd_nfce
+        FROM saida s
+        LEFT JOIN terceiro tv ON s.vendedoreucdg = tv.terceiroeucdg
+                             AND s.vendedorcdg   = tv.terceirocdg
+        WHERE s.saidaemissao > %s
+          AND s.saidamodelo = ANY(%s)
+          AND (s.saidacancelastatus IS NULL OR s.saidacancelastatus = '')
+        GROUP BY tv.terceironome
+    """
+    cursor = conn.cursor()
+    cursor.execute(sql, (desde, MODELOS_NFCE))
+    return cursor.fetchall()
 
 
 def buscar_historico_cliente(conn, eucdg, cdg):
@@ -339,34 +364,70 @@ def adicionar_devolucao(cliente, sqn, data, valor, motivo):
 
 # ── Lógica de negócio ─────────────────────────────────────────────────────────
 
-def buscar_cliente(clientes, cod_symplex, cnpj, razao_social):
+def buscar_cliente(clientes, cod_symplex, cnpj, razao_social,
+                   ie='', email='', telefones=None, nome_fantasia=''):
     """
-    Mesma lógica do buscarClienteCRM() do CRM:
-    1. Código Symplex (terceirocdg)
-    2. CNPJ limpo
-    3. Razão social normalizada
+    Mesma lógica do buscarClienteCRM() do CRM — prioridade:
+    1. Código Symplex  2. CNPJ/CPF  3. IE  4. Email  5. Telefone  6. Razão social  7. Nome fantasia
     """
     cnpj_limpo = limpar_cnpj(cnpj)
-    cod_str = str(cod_symplex) if cod_symplex else ''
+    cod_str    = str(cod_symplex) if cod_symplex else ''
+    telefones  = [t for t in (telefones or []) if t and t.strip()]
+    ie_norm    = re.sub(r'\D', '', ie or '')
+    email_norm = (email or '').lower().strip()
 
     if cod_str:
         c = next((x for x in clientes if str(x.get('codCliente', '')) == cod_str), None)
-        if c:
-            return c
+        if c: return c
 
-    if cnpj_limpo:
+    if cnpj_limpo and len(cnpj_limpo) >= 11:
         c = next((x for x in clientes if limpar_cnpj(x.get('cnpj', '')) == cnpj_limpo), None)
-        if c:
-            return c
+        if c: return c
+
+    if ie_norm and len(ie_norm) >= 8:
+        c = next((x for x in clientes
+                  if re.sub(r'\D', '', x.get('ie', '') or '') == ie_norm), None)
+        if c: return c
+
+    if email_norm and '@' in email_norm:
+        c = next((x for x in clientes
+                  if (x.get('email', '') or '').lower().strip() == email_norm
+                  or (x.get('email2', '') or '').lower().strip() == email_norm), None)
+        if c: return c
+
+    for tel in telefones:
+        tel_norm = re.sub(r'\D', '', tel)[-8:]
+        if len(tel_norm) >= 8:
+            c = next((x for x in clientes
+                      if any(re.sub(r'\D', '', x.get(f, '') or '')[-8:] == tel_norm
+                             for f in ('whatsapp', 'tel', 'tel2', 'tel3'))), None)
+            if c: return c
 
     rs = normalize(razao_social)
-    c = next(
-        (x for x in clientes
-         if normalize(x.get('razaoSocial', '')) == rs
-         or normalize(x.get('razaoSocial', '')).startswith(rs[:15])),
-        None
-    )
-    return c
+    if rs:
+        c = next(
+            (x for x in clientes
+             if normalize(x.get('razaoSocial', '')) == rs
+             or normalize(x.get('razaoSocial', '')).startswith(rs[:20])
+             or (len(rs) >= 15 and rs.startswith(normalize(x.get('razaoSocial', ''))[:15]))),
+            None
+        )
+        if c: return c
+
+    nf = normalize(nome_fantasia)
+    if nf and len(nf) >= 5:
+        c = next(
+            (x for x in clientes
+             if x.get('nomeFantasia') and (
+                 normalize(x['nomeFantasia']) == nf
+                 or normalize(x['nomeFantasia']).startswith(nf[:20])
+                 or (len(nf) >= 15 and nf.startswith(normalize(x['nomeFantasia'])[:15]))
+             )),
+            None
+        )
+        if c: return c
+
+    return None
 
 
 def adicionar_historico(cliente, nf_numero, data_nf, valor_total, produtos):
@@ -468,6 +529,8 @@ def sincronizar():
             cli_cdg      = nota['cli_cdg']
             razao_social = str(nota['cli_razao']    or '').upper().strip()
             cnpj_raw     = str(nota['cli_cnpj']     or '')
+            ie_raw       = str(nota['cli_ie']       or '').strip()
+            nomefant     = str(nota['cli_nomefant'] or '').upper().strip()
             whatsapp     = str(nota['cli_whatsapp'] or '').strip()
             tel          = str(nota['cli_tel']      or '').strip()
             tel2         = str(nota['cli_tel2']     or '').strip()
@@ -492,7 +555,12 @@ def sincronizar():
             vendedor_final = usuario_vend['nome'] if usuario_vend else nome_vend
 
             # Buscar ou criar cliente
-            cliente = buscar_cliente(clientes, cli_cdg, cnpj_raw, razao_social)
+            cliente = buscar_cliente(
+                clientes, cli_cdg, cnpj_raw, razao_social,
+                ie=ie_raw, email=email,
+                telefones=[whatsapp, tel, tel2],
+                nome_fantasia=nomefant,
+            )
 
             if not cliente:
                 # ── Criar novo cliente ──────────────────────────────────────
@@ -538,6 +606,10 @@ def sincronizar():
                     except Exception as e:
                         log_erro(f"Erro ao carregar histórico de {razao_social}", e)
 
+                # Qualificação: ATIVO (≥ min_nfs NFs) ou AVULSO (1 NF, sem recorrência)
+                total_nfs = len(cliente.get('comprasHistorico', [])) + 1
+                cliente['qualificacaoSymplex'] = 'ATIVO' if total_nfs >= MIN_NFS else 'AVULSO'
+
                 clientes.append(cliente)
                 adicionar_pendencia(config, cliente, 'novo', nf_num, vendedor_final)
                 criados += 1
@@ -569,6 +641,18 @@ def sincronizar():
                 )
                 atualizados += 1
                 log(f"  ATUALIZADO: {razao_social} | NF {nf_num}")
+
+                # Enriquecer histórico de cliente existente sem histórico do Symplex
+                if not cliente.get('comprasHistorico') and CFG.get('historico_inicial', True):
+                    try:
+                        historico = buscar_historico_cliente(conn, cli_eucdg, cli_cdg)
+                        if historico:
+                            cliente['comprasHistorico'] = historico
+                            devolucoes_hist = buscar_devolucoes_cliente(conn, cli_eucdg, cli_cdg)
+                            cliente['devolucaoHistorico'] = devolucoes_hist
+                            log(f"  Histórico carregado p/ existente: {razao_social} ({len(historico)} NFs)")
+                    except Exception as e:
+                        log_erro(f"Erro ao carregar histórico de {razao_social}", e)
 
             # Histórico de compras
             adicionar_historico(cliente, nf_num, data_nf, valor_total, produtos)
@@ -603,8 +687,8 @@ def sincronizar():
         log(f"{len(devolucoes_novas)} devolução(ões) encontrada(s) para processar")
         for dev in devolucoes_novas:
             try:
-                cli_eucdg_d = dev['cli_eucdg']
                 cli_cdg_d   = dev['cli_cdg']
+                cli_eucdg_d = dev['cli_eucdg']
                 sqn_d       = dev['devolucaosqn']
                 data_d      = formatar_data(dev['data'])
                 valor_d     = float(dev['valor'] or 0)
@@ -613,7 +697,6 @@ def sincronizar():
                 cliente_d = buscar_cliente(clientes, cli_cdg_d, '', '')
                 if not cliente_d:
                     continue
-
                 adicionar_devolucao(cliente_d, sqn_d, data_d, valor_d, motivo_d)
                 devol_processadas += 1
                 log(f"  DEVOLUÇÃO: {cliente_d.get('razaoSocial','')} | Sqn {sqn_d} | R$ {valor_d:.2f}")
@@ -622,17 +705,34 @@ def sincronizar():
     except Exception as e:
         log_erro("Erro na consulta SQL de devoluções (tabela devolucao)", e)
 
+    # 4. Processar NFCe — soma ao total de vendedor, não gera cliente/deal
+    nfce_totais = json.loads(data_fb.get('nfceTotais', '{}'))
+    try:
+        nfce_rows = buscar_nfce_por_vendedor(conn, ultimo_sync)
+        if nfce_rows:
+            for row in nfce_rows:
+                vend = str(row['vend_nome'] or 'SEM VENDEDOR').upper().strip()
+                key  = re.sub(r'[^A-Z0-9]', '_', vend)
+                if key not in nfce_totais:
+                    nfce_totais[key] = {'nome': vend, 'total': 0.0, 'qtd': 0}
+                nfce_totais[key]['total'] += float(row['total_nfce'] or 0)
+                nfce_totais[key]['qtd']   += int(row['qtd_nfce'] or 0)
+            log(f"NFCe: {sum(int(r['qtd_nfce']) for r in nfce_rows)} op(s) acumuladas por vendedor")
+    except Exception as e:
+        log_erro("Erro ao processar NFCe (tabela saida modelo 65)", e)
+
     conn.close()
 
-    # 4. Salvar no Firebase (somente se houver mudanças)
+    # 5. Salvar no Firebase (somente se houver mudanças)
     if criados + atualizados + devol_processadas > 0:
         agora = datetime.now().isoformat()
         try:
             DOC_DADOS.update({
-                'clientes':  json.dumps(clientes,  ensure_ascii=False),
-                'deals':     json.dumps(deals,      ensure_ascii=False),
-                'config':    json.dumps(config,     ensure_ascii=False),
-                'updatedAt': agora,
+                'clientes':   json.dumps(clientes,    ensure_ascii=False),
+                'deals':      json.dumps(deals,        ensure_ascii=False),
+                'config':     json.dumps(config,       ensure_ascii=False),
+                'nfceTotais': json.dumps(nfce_totais,  ensure_ascii=False),
+                'updatedAt':  agora,
             })
             set_ultimo_sync(agora)
             log(f"Firebase atualizado: {criados} criados, {atualizados} atualizados, "

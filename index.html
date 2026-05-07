@@ -415,6 +415,7 @@ tbody tr:hover td{background:var(--surface2);}
           <option value="">Todos os clientes</option>
           <option value="proximos-inativo">⚠️ Próximos de inativar</option>
           <option value="proximos-desvinculo">🔗 Próximos de desvincular</option>
+          <option value="base-symplex">📂 Base Symplex (avulsos)</option>
         </select>
         <button id="btn-exportar-c" class="btn-outline btn-green" onclick="exportarClientes()" style="display:none">Exportar Excel</button>
         <button class="btn-primary" onclick="abrirCliente()">+ Novo cliente</button>
@@ -1973,6 +1974,12 @@ function renderClientes(){
   }
   const lista=clientes.filter(c=>{
     if(!clienteVisivel(c)) return false;
+    // Ocultar clientes avulsos do Symplex na view normal; mostrar só na Base Symplex
+    if(frisco==='base-symplex'){
+      if(c.qualificacaoSymplex!=='AVULSO') return false;
+    } else {
+      if(c.qualificacaoSymplex==='AVULSO') return false;
+    }
     const txt=(c.razaoSocial+c.nomeFantasia+c.cnpj+c.ie+c.email+c.email2+c.contato+c.whatsapp+c.tel+c.tel2+c.tel3+c.cidade+c.estado+c.transportadora+c.categoria+c.codCliente+c.vendedor).toLowerCase();
     if(!txt.includes(q)) return false;
     if(fs&&c.status!==fs) return false;
@@ -1994,6 +2001,7 @@ function renderClientes(){
       const restantes=diasVinculo-diasVinc;
       return restantes>=0&&restantes<=15;
     }
+    if(frisco==='base-symplex') return true;
     return true;
   });
   document.getElementById('metrics-c').innerHTML=`
@@ -2401,12 +2409,19 @@ function renderDashboard(){
   });
   scopeRank.forEach(d=>{
     if(!d.vendedor) return;
-    if(!vmap[d.vendedor]) vmap[d.vendedor]={vendas:0,cadastros:0,val:0,reat:0};
+    if(!vmap[d.vendedor]) vmap[d.vendedor]={vendas:0,cadastros:0,val:0,reat:0,nfceTotal:0,nfceQtd:0};
     if(d.etapa==='ganho'){ vmap[d.vendedor].vendas++; vmap[d.vendedor].val+=Number(d.valor||0); }
+  });
+  // Adicionar NFCe ao mapa por vendedor
+  const nfceTotais=CONFIG.nfceTotais||{};
+  Object.values(nfceTotais).forEach(nr=>{
+    const nome=(nr.nome||'').toUpperCase().trim();
+    const vEnd=Object.keys(vmap).find(k=>k.toUpperCase()===nome||nome.startsWith(k.toUpperCase().split(' ')[0]));
+    if(vEnd){ vmap[vEnd].nfceTotal+=Number(nr.total||0); vmap[vEnd].nfceQtd+=Number(nr.qtd||0); }
   });
   // Garantir que todos os vendedores aparecem mesmo sem negócios
   const todosVends=usuarios.filter(u=>u.role==='vendedor'||(CFG.role==='gestor'&&u.role==='gerente'));
-  todosVends.forEach(u=>{ if(!vmap[u.nome]) vmap[u.nome]={vendas:0,cadastros:0,val:0,reat:0}; });
+  todosVends.forEach(u=>{ if(!vmap[u.nome]) vmap[u.nome]={vendas:0,cadastros:0,val:0,reat:0,nfceTotal:0,nfceQtd:0}; });
   // Cadastros = novos clientes cadastrados pelo vendedor no período
   clientes.filter(c=>{
     if(!c.cadastradoPor||c.cadastradoPor==='sistema'||c.cadastradoPor==='importação') return false;
@@ -2429,6 +2444,7 @@ function renderDashboard(){
       <span style="font-weight:600;color:var(--c-text)">${s.cadastros}</span>
       <span style="font-weight:600;color:#7C3AED">${s.reat}</span>
       <span style="font-weight:600;font-family:var(--mono);font-size:11px">${podeVerValor?fmt(s.val):'••••••'}</span>
+      ${s.nfceQtd>0?`<span style="font-size:10px;color:var(--text3)" title="NFCe (balcão)">NFCe: ${s.nfceQtd} ops · ${podeVerValor?fmt(s.nfceTotal):'••••'}</span>`:'<span></span>'}
       <div>${podeVerValor&&meta>0?`<div class="meta-pct">${pct}%</div><div class="meta-bar-wrap"><div class="meta-bar" style="width:${pct}%;background:${pct>=100?'var(--g-dot)':pct>=60?'var(--o-dot)':'var(--p-dot)'}"></div></div>`:podeVerValor?'<span style="font-size:11px;color:var(--text3)">Sem meta</span>':'<span style="font-size:11px;color:var(--text3)">••••</span>'}</div>
     </div>`;
   }).join(''):'<div style="padding:1.5rem;text-align:center;color:var(--text3);font-size:13px">Sem dados</div>';
@@ -3225,8 +3241,10 @@ function renderOportunidades(){
     const isInativo=c.status==='CLIENTE INATIVO';
     const isDesvinculado=!c.vendedor&&c.status!=='LEADS'&&c.status!=='CLIENTE INATIVO';
 
-    // Vendedor vê todos os inativos (com ou sem vínculo) + desvinculados
-    // Não vê inativos de outros vendedores é ERRADO — todos podem trabalhar inativos
+    // Regra: só aparecem clientes com histórico de compra (CRM ou Symplex)
+    const temHistorico=(c.comprasHistorico?.length>0)||deals.some(d=>d.clienteId===c.id&&d.etapa==='ganho');
+    if(!temHistorico) return false;
+
     if(CFG.role==='vendedor'){
       if(!isInativo&&!isDesvinculado) return false;
     }
