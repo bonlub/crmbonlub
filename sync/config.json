@@ -1,0 +1,35 @@
+{
+  "_comentario": "Use o script configurar.bat para alterar IP, porta e senha sem editar este arquivo manualmente.",
+
+  "sql": {
+    "host":     "127.0.0.1",
+    "porta":    5432,
+    "database": "dbCONTTRADE",
+    "user":     "conttrade",
+    "password": "Ct06101",
+    "driver":   "postgresql"
+  },
+
+  "firebase_credentials": "firebase-credentials.json",
+
+  "tabelas": {
+    "notas_fiscais":  "saida",
+    "itens_nf":       "saidaitem",
+    "clientes":       "terceiro",
+    "produtos":       "produto",
+    "historico":      "historicovenda",
+    "cidade":         "cidade"
+  },
+
+  "colunas_cidade": {
+    "_aviso": "Se a query falhar com 'column does not exist', rode '\\d cidade' no psql e corrija aqui.",
+    "nome": "cidadenome",
+    "uf":   "cidadeuf"
+  },
+
+  "historico_inicial": true,
+
+  "intervalo_minutos": 15,
+  "log_arquivo":       "sync.log",
+  "log_max_linhas":    5000
+}
