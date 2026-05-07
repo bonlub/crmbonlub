@@ -1,0 +1,55 @@
+{
+  "_comentario": "Use o script configurar.bat para alterar IP, porta e senha sem editar este arquivo manualmente.",
+
+  "sql": {
+    "host":     "127.0.0.1",
+    "porta":    5432,
+    "database": "dbCONTTRADE",
+    "user":     "conttrade",
+    "password": "Ct06101",
+    "driver":   "postgresql"
+  },
+
+  "firebase_credentials": "firebase-credentials.json",
+
+  "tabelas": {
+    "notas_fiscais":  "nf_cabecalho",
+    "itens_nf":       "nf_itens",
+    "clientes":       "clientes",
+    "vendedores":     "vendedores",
+    "produtos":       "produtos"
+  },
+
+  "colunas": {
+    "nf_numero":          "numero_nf",
+    "nf_data":            "data_emissao",
+    "nf_valor_total":     "valor_total",
+    "nf_status":          "status",
+    "nf_status_emitida":  "EMITIDA",
+    "nf_cod_cliente":     "cod_cliente",
+    "nf_cod_vendedor":    "cod_vendedor",
+
+    "cli_codigo":         "cod_cliente",
+    "cli_razao":          "razao_social",
+    "cli_cnpj":           "cnpj",
+    "cli_cidade":         "cidade",
+    "cli_estado":         "estado",
+    "cli_endereco":       "endereco",
+
+    "vend_codigo":        "cod_vendedor",
+    "vend_nome":          "nome",
+
+    "item_nf_numero":     "numero_nf",
+    "item_cod_produto":   "cod_produto",
+    "item_quantidade":    "quantidade",
+    "item_valor_unit":    "valor_unitario",
+    "item_valor_total":   "valor_total",
+
+    "prod_codigo":        "cod_produto",
+    "prod_descricao":     "descricao"
+  },
+
+  "intervalo_minutos": 15,
+  "log_arquivo":       "sync.log",
+  "log_max_linhas":    5000
+}

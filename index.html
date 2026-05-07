@@ -569,6 +569,21 @@ tbody tr:hover td{background:var(--surface2);}
           <div id="cfg-hora-status" style="margin-top:8px;font-size:12px"></div>
         </div>
 
+        <div style="background:var(--surface);border:0.5px solid var(--p-border);border-radius:var(--radius-lg);padding:1.25rem">
+          <div style="font-size:13px;font-weight:600;margin-bottom:.5rem;color:var(--p-text)">🗑️ Limpar dados do Symplex</div>
+          <p style="font-size:12px;color:var(--text2);margin-bottom:6px;line-height:1.6">
+            Remove <strong>todos</strong> os dados importados pelo Symplex (Excel ou automático): clientes, negócios no funil, tarefas vinculadas e pendências. Use para recomeçar do zero.
+          </p>
+          <ul style="font-size:11px;color:var(--text3);margin:0 0 10px 16px;line-height:1.8">
+            <li>Clientes com <strong>cadastradoPor = SYMPLEX</strong> ou <strong>SYMPLEX_AUTO</strong> serão removidos</li>
+            <li>Negócios e tarefas vinculados a esses clientes serão removidos</li>
+            <li>Todas as pendências Symplex serão limpas</li>
+            <li>Clientes cadastrados manualmente <strong>não são afetados</strong></li>
+          </ul>
+          <button class="btn-primary" style="width:100%;background:#DC2626;border-color:#B91C1C" onclick="limparDadosSymplex()">🗑️ Limpar todos os dados do Symplex</button>
+          <div id="symplex-reset-status" style="margin-top:8px;font-size:12px"></div>
+        </div>
+
         <div style="background:var(--surface);border:0.5px solid var(--border);border-radius:var(--radius-lg);padding:1.25rem">
           <div style="font-size:13px;font-weight:600;margin-bottom:.5rem">⚡ Reativar todos os clientes inativos</div>
           <p style="font-size:12px;color:var(--text2);margin-bottom:10px;line-height:1.6">
@@ -3079,6 +3094,52 @@ function salvarConfig(){
   syncRemote();
   if(changes.length) registrarLog('config','Configuração alterada',changes.join(' | '));
   toast('Configurações salvas!','ok');
+}
+
+function limparDadosSymplex(){
+  const origens = ['SYMPLEX','SYMPLEX_AUTO'];
+  const clientesSymplex = clientes.filter(c => origens.includes(c.cadastradoPor));
+  const idsSymplex = new Set(clientesSymplex.map(c => c.id));
+  const totalClientes = clientesSymplex.length;
+  const totalDeals    = deals.filter(d => idsSymplex.has(d.clienteId) || (d.obs||'').includes('SYMPLEX')).length;
+  const totalTarefas  = tarefas.filter(t => idsSymplex.has(t.clienteId)).length;
+  const totalPends    = (CONFIG.symplexPendencias||[]).length;
+
+  if(!totalClientes && !totalPends){
+    const st = document.getElementById('symplex-reset-status');
+    if(st) st.innerHTML = '<span style="color:var(--text3)">Nenhum dado do Symplex encontrado.</span>';
+    return;
+  }
+
+  confirmar(
+    `Tem certeza que deseja apagar TODOS os dados do Symplex?\n\n` +
+    `• ${totalClientes} cliente(s) serão removidos\n` +
+    `• ${totalDeals} negócio(s) do funil serão removidos\n` +
+    `• ${totalTarefas} tarefa(s) serão removidas\n` +
+    `• ${totalPends} pendência(s) serão limpas\n\n` +
+    `Esta ação não pode ser desfeita.`,
+    () => {
+      // Remover clientes Symplex
+      clientes = clientes.filter(c => !origens.includes(c.cadastradoPor));
+      // Remover deals vinculados ou com obs SYMPLEX
+      deals = deals.filter(d => !idsSymplex.has(d.clienteId) && !(d.obs||'').includes('SYMPLEX'));
+      // Remover tarefas vinculadas
+      tarefas = tarefas.filter(t => !idsSymplex.has(t.clienteId));
+      // Limpar pendências
+      CONFIG.symplexPendencias = [];
+      localStorage.setItem('crm7_config', JSON.stringify(CONFIG));
+
+      saveLocal(); syncRemote();
+      registrarLog('config', 'Dados Symplex apagados',
+        `${totalClientes} clientes, ${totalDeals} negócios, ${totalTarefas} tarefas, ${totalPends} pendências removidos`);
+
+      const st = document.getElementById('symplex-reset-status');
+      if(st) st.innerHTML = `<span style="color:var(--g-text)">✓ Concluído: ${totalClientes} clientes, ${totalDeals} negócios e ${totalTarefas} tarefas removidos.</span>`;
+
+      toast('Dados do Symplex removidos com sucesso!', 'ok');
+      renderAll();
+    }
+  );
 }
 
 function reativarTodosClientes(){
