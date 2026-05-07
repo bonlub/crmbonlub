@@ -1,6 +1,6 @@
 """
-CRM Bonlub — Sincronizador automático Symplex → Firebase
-Roda a cada 15 minutos, busca NFs novas no SQL Server e atualiza o CRM.
+CRM Bonlub — Sincronizador automático Symplex/Conttrade → Firebase
+Roda a cada 15 minutos, busca NFs novas no PostgreSQL e atualiza o CRM.
 """
 
 import json
@@ -11,7 +11,8 @@ import re
 import time
 from datetime import datetime
 
-import pyodbc
+import psycopg2
+import psycopg2.extras
 import schedule
 import firebase_admin
 from firebase_admin import credentials, firestore
@@ -117,34 +118,24 @@ def set_ultimo_sync(ts):
 
 # ── Conexão SQL ───────────────────────────────────────────────────────────────
 
-def _montar_server():
-    """Monta a string SERVER do pyodbc a partir de host, porta e instancia."""
-    host  = SQL.get('host', SQL.get('server', 'localhost'))
-    porta = SQL.get('porta', 1433)
-    inst  = (SQL.get('instancia') or '').strip()
-    if inst:
-        # Instância nomeada: host\instancia  (porta ignorada, SQL Browser resolve)
-        return f"{host}\\{inst}"
-    # Porta explícita: host,porta
-    return f"{host},{porta}"
-
 def conectar_sql():
-    conn_str = (
-        f"DRIVER={{{SQL.get('driver', 'ODBC Driver 17 for SQL Server')}}};"
-        f"SERVER={_montar_server()};"
-        f"DATABASE={SQL['database']};"
-        f"UID={SQL['user']};"
-        f"PWD={SQL['password']};"
-        "Encrypt=no;TrustServerCertificate=yes;"
+    """Conecta no PostgreSQL do Symplex/Conttrade."""
+    return psycopg2.connect(
+        host=SQL.get('host', '127.0.0.1'),
+        port=int(SQL.get('porta', 5432)),
+        dbname=SQL['database'],
+        user=SQL['user'],
+        password=SQL['password'],
+        connect_timeout=15,
+        cursor_factory=psycopg2.extras.RealDictCursor,
     )
-    return pyodbc.connect(conn_str, timeout=30)
 
 # ── Consultas SQL (adapte os nomes de tabelas/colunas no config.json) ─────────
 
 def buscar_nfs_novas(conn, desde):
     """
     Retorna todas as NFs emitidas após 'desde'.
-    AJUSTE: se o campo de status tiver valores diferentes, edite config.json → colunas.nf_status_emitida
+    Os nomes de tabelas/colunas são lidos do config.json — ajuste lá se necessário.
     """
     sql = f"""
         SELECT
@@ -160,12 +151,12 @@ def buscar_nfs_novas(conn, desde):
         FROM {TAB['notas_fiscais']} nf
         INNER JOIN {TAB['clientes']}   c ON nf.{COL['nf_cod_cliente']}  = c.{COL['cli_codigo']}
         INNER JOIN {TAB['vendedores']} v ON nf.{COL['nf_cod_vendedor']} = v.{COL['vend_codigo']}
-        WHERE nf.{COL['nf_data']} > ?
+        WHERE nf.{COL['nf_data']} > %s
           AND nf.{COL['nf_status']} = '{COL['nf_status_emitida']}'
         ORDER BY nf.{COL['nf_data']} ASC
     """
     cursor = conn.cursor()
-    cursor.execute(sql, desde)
+    cursor.execute(sql, (desde,))
     return cursor.fetchall()
 
 def buscar_produtos_nf(conn, nf_numero):
@@ -179,17 +170,17 @@ def buscar_produtos_nf(conn, nf_numero):
             i.{COL['item_valor_total']}  AS valor_total
         FROM {TAB['itens_nf']} i
         INNER JOIN {TAB['produtos']} p ON i.{COL['item_cod_produto']} = p.{COL['prod_codigo']}
-        WHERE i.{COL['item_nf_numero']} = ?
+        WHERE i.{COL['item_nf_numero']} = %s
     """
     cursor = conn.cursor()
-    cursor.execute(sql, nf_numero)
+    cursor.execute(sql, (nf_numero,))
     return [
         {
-            'codigo':     str(row.cod_produto or '').strip(),
-            'descricao':  str(row.descricao   or '').strip(),
-            'qtd':        float(row.quantidade or 0),
-            'valorUnit':  float(row.valor_unit or 0),
-            'valorTotal': float(row.valor_total or 0),
+            'codigo':     str(row['cod_produto'] or '').strip(),
+            'descricao':  str(row['descricao']   or '').strip(),
+            'qtd':        float(row['quantidade'] or 0),
+            'valorUnit':  float(row['valor_unit'] or 0),
+            'valorTotal': float(row['valor_total'] or 0),
         }
         for row in cursor.fetchall()
     ]
@@ -305,15 +296,15 @@ def sincronizar():
 
     for nota in notas:
         try:
-            nf_num       = str(nota.nf_numero).strip()
-            data_nf      = formatar_data(nota.nf_data)
-            valor_total  = float(nota.nf_valor_total or 0)
-            cod_cli      = str(nota.cli_codigo  or '').strip()
-            razao_social = str(nota.cli_razao   or '').upper().strip()
-            cnpj_raw     = str(nota.cli_cnpj    or '')
-            cidade       = str(nota.cli_cidade  or '').upper().strip()
-            estado       = str(nota.cli_estado  or '').upper().strip()
-            nome_vend    = str(nota.vend_nome   or '').upper().strip()
+            nf_num       = str(nota['nf_numero']).strip()
+            data_nf      = formatar_data(nota['nf_data'])
+            valor_total  = float(nota['nf_valor_total'] or 0)
+            cod_cli      = str(nota['cli_codigo']  or '').strip()
+            razao_social = str(nota['cli_razao']   or '').upper().strip()
+            cnpj_raw     = str(nota['cli_cnpj']    or '')
+            cidade       = str(nota['cli_cidade']  or '').upper().strip()
+            estado       = str(nota['cli_estado']  or '').upper().strip()
+            nome_vend    = str(nota['vend_nome']   or '').upper().strip()
 
             # NF já importada?
             if nf_num in nfs_existentes:

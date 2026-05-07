@@ -103,48 +103,43 @@ def pedir_valor(label, atual, oculto=False):
 
 # ── Teste de conexão ──────────────────────────────────────────────────────────
 def testar_conexao(cfg):
-    print(f"\n  {AMARELO('Testando conexão...')}")
+    print(f"\n  {AMARELO('Testando conexão PostgreSQL...')}")
     try:
-        import pyodbc
+        import psycopg2
     except ImportError:
-        print(VERMELHO("  ✗ pyodbc não instalado. Execute instalar.bat primeiro."))
+        print(VERMELHO("  ✗ psycopg2 não instalado. Execute instalar.bat primeiro."))
         return
 
     sql = cfg['sql']
-    server = sql.get('host', '')
-    inst   = sql.get('instancia', '').strip()
-    porta  = sql.get('porta', 1433)
-
-    if inst:
-        server_str = f"{server}\\{inst}"
-    else:
-        server_str = f"{server},{porta}"
-
-    conn_str = (
-        f"DRIVER={{{sql.get('driver', 'ODBC Driver 17 for SQL Server')}}};"
-        f"SERVER={server_str};"
-        f"DATABASE={sql.get('database', '')};"
-        f"UID={sql.get('user', '')};"
-        f"PWD={sql.get('password', '')};"
-        "Encrypt=no;TrustServerCertificate=yes;"
-    )
+    host  = sql.get('host', '127.0.0.1')
+    porta = int(sql.get('porta', 5432))
 
     try:
-        conn = pyodbc.connect(conn_str, timeout=8)
+        conn = psycopg2.connect(
+            host=host,
+            port=porta,
+            dbname=sql.get('database', ''),
+            user=sql.get('user', ''),
+            password=sql.get('password', ''),
+            connect_timeout=8,
+        )
         cursor = conn.cursor()
-        cursor.execute("SELECT @@VERSION")
-        versao = cursor.fetchone()[0].split('\n')[0]
+        cursor.execute("SELECT version()")
+        versao = cursor.fetchone()[0].split(',')[0]
+        cursor.execute("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema NOT IN ('pg_catalog','information_schema')")
+        n_tabelas = cursor.fetchone()[0]
         conn.close()
         print(VERDE(f"  ✓ Conexão bem-sucedida!"))
-        print(f"  Servidor: {versao}")
-    except pyodbc.Error as e:
+        print(f"  Servidor : {versao}")
+        print(f"  Tabelas  : {n_tabelas} encontradas no banco")
+    except psycopg2.Error as e:
         print(VERMELHO(f"  ✗ Falha na conexão:"))
         print(f"     {e}")
         print(f"\n  Verifique:")
-        print(f"    • IP correto: {server}")
-        print(f"    • Porta aberta: {porta}")
+        print(f"    • IP correto: {host}")
+        print(f"    • Porta aberta: {porta}  (padrão PostgreSQL)")
         print(f"    • Usuário/senha corretos")
-        print(f"    • SQL Server permite conexões remotas")
+        print(f"    • PostgreSQL permite conexões remotas (pg_hba.conf)")
 
 # ── Menu principal ────────────────────────────────────────────────────────────
 def main():

@@ -1,80 +1,109 @@
 """
 Script auxiliar para descobrir os nomes reais das tabelas e colunas
-do banco Symplex antes de configurar o config.json.
+do banco Symplex/Conttrade (PostgreSQL) antes de configurar o config.json.
 
 Execute: python descobrir_tabelas.py
 """
 
-import json, pyodbc, os
+import json, os
+import psycopg2
+import psycopg2.extras
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 with open(os.path.join(BASE_DIR, 'config.json'), encoding='utf-8') as f:
     CFG = json.load(f)
 
 SQL = CFG['sql']
-conn_str = (
-    f"DRIVER={{{SQL['driver']}}};"
-    f"SERVER={SQL['server']};"
-    f"DATABASE={SQL['database']};"
-    f"UID={SQL['user']};"
-    f"PWD={SQL['password']};"
-    "Encrypt=no;TrustServerCertificate=yes;"
+
+print("Conectando ao PostgreSQL...")
+conn = psycopg2.connect(
+    host=SQL.get('host', '127.0.0.1'),
+    port=int(SQL.get('porta', 5432)),
+    dbname=SQL['database'],
+    user=SQL['user'],
+    password=SQL['password'],
+    connect_timeout=10,
 )
+cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+print(f"Conectado em {SQL.get('host')}:{SQL.get('porta')} → banco: {SQL['database']}\n")
 
-print("Conectando ao SQL Server...")
-conn = pyodbc.connect(conn_str, timeout=10)
-cursor = conn.cursor()
-
-# Listar todas as tabelas do banco
-print("\n=== TABELAS DISPONÍVEIS ===")
+# ── Listar todos os schemas e tabelas ────────────────────────────────────────
+print("=== TABELAS DISPONÍVEIS ===")
 cursor.execute("""
-    SELECT TABLE_NAME
-    FROM INFORMATION_SCHEMA.TABLES
-    WHERE TABLE_TYPE = 'BASE TABLE'
-    ORDER BY TABLE_NAME
+    SELECT table_schema, table_name
+    FROM information_schema.tables
+    WHERE table_type = 'BASE TABLE'
+      AND table_schema NOT IN ('pg_catalog', 'information_schema')
+    ORDER BY table_schema, table_name
 """)
-tabelas = [row[0] for row in cursor.fetchall()]
+tabelas = cursor.fetchall()
+schema_atual = None
 for t in tabelas:
-    print(f"  {t}")
+    if t['table_schema'] != schema_atual:
+        schema_atual = t['table_schema']
+        print(f"\n  [{schema_atual}]")
+    print(f"    {t['table_name']}")
 
-# Palavras-chave para identificar as tabelas importantes
+nomes_tabelas = [t['table_name'] for t in tabelas]
+
+# ── Sugestões automáticas de mapeamento ─────────────────────────────────────
 keywords = {
-    'notas_fiscais': ['nota', 'nf', 'fiscal', 'invoice', 'emissao'],
-    'itens_nf':      ['item', 'produto', 'detalhe', 'linha'],
-    'clientes':      ['cliente', 'parceiro', 'fornecedor', 'customer'],
-    'vendedores':    ['vendedor', 'funcionario', 'representante', 'seller'],
-    'produtos':      ['produto', 'item', 'estoque', 'mercadoria'],
+    'notas_fiscais': ['nota', 'nf', 'fiscal', 'invoice', 'emissao', 'emi'],
+    'itens_nf':      ['item', 'iten', 'produto', 'detalhe', 'linha', 'nf_prod'],
+    'clientes':      ['cliente', 'parceiro', 'fornecedor', 'customer', 'pessoa'],
+    'vendedores':    ['vendedor', 'funcionario', 'representante', 'seller', 'vend'],
+    'produtos':      ['produto', 'item', 'estoque', 'mercadoria', 'prod'],
 }
 
-print("\n=== SUGESTÕES DE MAPEAMENTO ===")
+print("\n\n=== SUGESTÕES DE MAPEAMENTO (atualize o config.json) ===")
 for chave, palavras in keywords.items():
-    sugeridas = [t for t in tabelas if any(p in t.lower() for p in palavras)]
-    print(f"\n{chave}:")
+    sugeridas = [t for t in nomes_tabelas if any(p in t.lower() for p in palavras)]
+    print(f"\n  {chave}:")
     if sugeridas:
         for s in sugeridas:
-            print(f"  → {s}")
+            print(f"    → {s}")
     else:
-        print("  (nenhuma encontrada — verifique manualmente)")
+        print("    (nenhuma encontrada — verifique manualmente)")
 
-# Mostrar colunas das tabelas sugeridas
-print("\n=== COLUNAS DAS TABELAS SUGERIDAS ===")
+# ── Mostrar colunas das tabelas sugeridas ────────────────────────────────────
 tabelas_ver = set()
 for palavras in keywords.values():
-    for t in tabelas:
+    for t in nomes_tabelas:
         if any(p in t.lower() for p in palavras):
             tabelas_ver.add(t)
 
+print("\n\n=== COLUNAS DAS TABELAS RELEVANTES ===")
 for tabela in sorted(tabelas_ver):
     print(f"\n  [{tabela}]")
-    cursor.execute(f"""
-        SELECT COLUMN_NAME, DATA_TYPE, CHARACTER_MAXIMUM_LENGTH
-        FROM INFORMATION_SCHEMA.COLUMNS
-        WHERE TABLE_NAME = '{tabela}'
-        ORDER BY ORDINAL_POSITION
-    """)
+    cursor.execute("""
+        SELECT column_name, data_type, character_maximum_length, is_nullable
+        FROM information_schema.columns
+        WHERE table_name = %s
+          AND table_schema NOT IN ('pg_catalog', 'information_schema')
+        ORDER BY ordinal_position
+    """, (tabela,))
     for col in cursor.fetchall():
-        tamanho = f"({col[2]})" if col[2] else ''
-        print(f"    {col[0]:40} {col[1]}{tamanho}")
+        tam = f"({col['character_maximum_length']})" if col['character_maximum_length'] else ''
+        nulo = '' if col['is_nullable'] == 'YES' else ' NOT NULL'
+        print(f"    {col['column_name']:40} {col['data_type']}{tam}{nulo}")
+
+# ── Amostra de dados das tabelas mais relevantes ─────────────────────────────
+print("\n\n=== AMOSTRA DE DADOS (5 linhas de cada tabela relevante) ===")
+for tabela in sorted(tabelas_ver)[:6]:
+    print(f"\n  [{tabela}] — primeiras 5 linhas:")
+    try:
+        cursor.execute(f'SELECT * FROM "{tabela}" LIMIT 5')
+        rows = cursor.fetchall()
+        if rows:
+            colunas = list(rows[0].keys())
+            print(f"    Colunas: {', '.join(colunas)}")
+            for row in rows:
+                vals = [str(v)[:30] for v in row.values()]
+                print(f"    {' | '.join(vals)}")
+        else:
+            print("    (tabela vazia)")
+    except Exception as e:
+        print(f"    Erro ao ler: {e}")
 
 conn.close()
-print("\n\nConcluído! Use as informações acima para preencher o config.json.")
+print("\n\nConcluído! Copie e cole o resultado acima para mapear o config.json.")

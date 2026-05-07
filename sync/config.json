@@ -2,52 +2,51 @@
   "_comentario": "Use o script configurar.bat para alterar IP, porta e senha sem editar este arquivo manualmente.",
 
   "sql": {
-    "host":     "192.168.1.100",
-    "porta":    1433,
-    "instancia": "",
-    "database": "NOME_DO_BANCO_SYMPLEX",
-    "user":     "usuario_sql",
-    "password": "senha_sql",
-    "driver":   "ODBC Driver 17 for SQL Server"
+    "host":     "127.0.0.1",
+    "porta":    5432,
+    "database": "dbCONTTRADE",
+    "user":     "conttrade",
+    "password": "Ct06101",
+    "driver":   "postgresql"
   },
 
   "firebase_credentials": "firebase-credentials.json",
 
   "tabelas": {
-    "notas_fiscais":  "NotasFiscais",
-    "itens_nf":       "ItensNF",
-    "clientes":       "Clientes",
-    "vendedores":     "Vendedores",
-    "produtos":       "Produtos"
+    "notas_fiscais":  "nf_cabecalho",
+    "itens_nf":       "nf_itens",
+    "clientes":       "clientes",
+    "vendedores":     "vendedores",
+    "produtos":       "produtos"
   },
 
   "colunas": {
-    "nf_numero":          "NumeroNF",
-    "nf_data":            "DataEmissao",
-    "nf_valor_total":     "ValorTotal",
-    "nf_status":          "Status",
+    "nf_numero":          "numero_nf",
+    "nf_data":            "data_emissao",
+    "nf_valor_total":     "valor_total",
+    "nf_status":          "status",
     "nf_status_emitida":  "EMITIDA",
-    "nf_cod_cliente":     "CodigoCliente",
-    "nf_cod_vendedor":    "CodigoVendedor",
+    "nf_cod_cliente":     "cod_cliente",
+    "nf_cod_vendedor":    "cod_vendedor",
 
-    "cli_codigo":         "CodigoCliente",
-    "cli_razao":          "RazaoSocial",
-    "cli_cnpj":           "CNPJ",
-    "cli_cidade":         "Cidade",
-    "cli_estado":         "Estado",
-    "cli_endereco":       "Endereco",
+    "cli_codigo":         "cod_cliente",
+    "cli_razao":          "razao_social",
+    "cli_cnpj":           "cnpj",
+    "cli_cidade":         "cidade",
+    "cli_estado":         "estado",
+    "cli_endereco":       "endereco",
 
-    "vend_codigo":        "CodigoVendedor",
-    "vend_nome":          "NomeVendedor",
+    "vend_codigo":        "cod_vendedor",
+    "vend_nome":          "nome",
 
-    "item_nf_numero":     "NumeroNF",
-    "item_cod_produto":   "CodigoProduto",
-    "item_quantidade":    "Quantidade",
-    "item_valor_unit":    "ValorUnitario",
-    "item_valor_total":   "ValorTotal",
+    "item_nf_numero":     "numero_nf",
+    "item_cod_produto":   "cod_produto",
+    "item_quantidade":    "quantidade",
+    "item_valor_unit":    "valor_unitario",
+    "item_valor_total":   "valor_total",
 
-    "prod_codigo":        "CodigoProduto",
-    "prod_descricao":     "DescricaoProduto"
+    "prod_codigo":        "cod_produto",
+    "prod_descricao":     "descricao"
   },
 
   "intervalo_minutos": 15,
