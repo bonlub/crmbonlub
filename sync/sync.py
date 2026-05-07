@@ -273,6 +273,70 @@ def buscar_historico_cliente(conn, eucdg, cdg):
     ]
     return resultado[-50:]  # máx. 50 NFs mais recentes
 
+
+def buscar_devolucoes_novas(conn, desde):
+    """Devoluções efetivadas após 'desde', não canceladas."""
+    sql = """
+        SELECT
+            d.devolucaoeucdg,
+            d.devolucaosqn,
+            d.terceiroeucdg             AS cli_eucdg,
+            d.terceirocdg               AS cli_cdg,
+            d.devolucaodata             AS data,
+            d.devolucaototal            AS valor,
+            COALESCE(d.devolucaomotivo, '') AS motivo
+        FROM devolucao d
+        WHERE d.devolucaodata > %s
+          AND (d.devolucaostatus IS NULL
+               OR d.devolucaostatus NOT ILIKE 'CANCEL%')
+        ORDER BY d.devolucaodata ASC
+    """
+    cursor = conn.cursor()
+    cursor.execute(sql, (desde,))
+    return cursor.fetchall()
+
+
+def buscar_devolucoes_cliente(conn, eucdg, cdg):
+    """Histórico completo de devoluções de um cliente (carga inicial)."""
+    sql = """
+        SELECT
+            d.devolucaosqn              AS sqn,
+            d.devolucaodata             AS data,
+            d.devolucaototal            AS valor,
+            COALESCE(d.devolucaomotivo, '') AS motivo
+        FROM devolucao d
+        WHERE d.terceiroeucdg = %s
+          AND d.terceirocdg   = %s
+          AND (d.devolucaostatus IS NULL
+               OR d.devolucaostatus NOT ILIKE 'CANCEL%')
+        ORDER BY d.devolucaodata ASC
+    """
+    cursor = conn.cursor()
+    cursor.execute(sql, (eucdg, cdg))
+    return [
+        {
+            'sqn':    str(row['sqn']),
+            'data':   formatar_data(row['data']),
+            'valor':  float(row['valor'] or 0),
+            'motivo': str(row['motivo'] or '').strip(),
+        }
+        for row in cursor.fetchall()
+    ]
+
+
+def adicionar_devolucao(cliente, sqn, data, valor, motivo):
+    if 'devolucaoHistorico' not in cliente:
+        cliente['devolucaoHistorico'] = []
+    sqn_str = str(sqn)
+    if any(d.get('sqn') == sqn_str for d in cliente['devolucaoHistorico']):
+        return
+    cliente['devolucaoHistorico'].append({
+        'sqn':    sqn_str,
+        'data':   data,
+        'valor':  valor,
+        'motivo': motivo,
+    })
+
 # ── Lógica de negócio ─────────────────────────────────────────────────────────
 
 def buscar_cliente(clientes, cod_symplex, cnpj, razao_social):
@@ -468,7 +532,9 @@ def sincronizar():
                     try:
                         historico = buscar_historico_cliente(conn, cli_eucdg, cli_cdg)
                         cliente['comprasHistorico'] = historico
-                        log(f"  Histórico: {len(historico)} NF(s) carregadas para {razao_social}")
+                        devolucoes_hist = buscar_devolucoes_cliente(conn, cli_eucdg, cli_cdg)
+                        cliente['devolucaoHistorico'] = devolucoes_hist
+                        log(f"  Histórico: {len(historico)} NF(s), {len(devolucoes_hist)} devolução(ões) para {razao_social}")
                     except Exception as e:
                         log_erro(f"Erro ao carregar histórico de {razao_social}", e)
 
@@ -530,10 +596,36 @@ def sincronizar():
         except Exception as e:
             log_erro(f"Erro ao processar NF {nota.get('nf_numero', '?')}", e)
 
+    # 3. Processar devoluções novas
+    devol_processadas = 0
+    try:
+        devolucoes_novas = buscar_devolucoes_novas(conn, ultimo_sync)
+        log(f"{len(devolucoes_novas)} devolução(ões) encontrada(s) para processar")
+        for dev in devolucoes_novas:
+            try:
+                cli_eucdg_d = dev['cli_eucdg']
+                cli_cdg_d   = dev['cli_cdg']
+                sqn_d       = dev['devolucaosqn']
+                data_d      = formatar_data(dev['data'])
+                valor_d     = float(dev['valor'] or 0)
+                motivo_d    = str(dev['motivo'] or '').strip()
+
+                cliente_d = buscar_cliente(clientes, cli_cdg_d, '', '')
+                if not cliente_d:
+                    continue
+
+                adicionar_devolucao(cliente_d, sqn_d, data_d, valor_d, motivo_d)
+                devol_processadas += 1
+                log(f"  DEVOLUÇÃO: {cliente_d.get('razaoSocial','')} | Sqn {sqn_d} | R$ {valor_d:.2f}")
+            except Exception as e:
+                log_erro(f"Erro ao processar devolução sqn={dev.get('devolucaosqn','?')}", e)
+    except Exception as e:
+        log_erro("Erro na consulta SQL de devoluções (tabela devolucao)", e)
+
     conn.close()
 
-    # 3. Salvar no Firebase (somente se houver mudanças)
-    if criados + atualizados > 0:
+    # 4. Salvar no Firebase (somente se houver mudanças)
+    if criados + atualizados + devol_processadas > 0:
         agora = datetime.now().isoformat()
         try:
             DOC_DADOS.update({
@@ -543,7 +635,8 @@ def sincronizar():
                 'updatedAt': agora,
             })
             set_ultimo_sync(agora)
-            log(f"Firebase atualizado: {criados} criados, {atualizados} atualizados, {ignoradas} já existiam")
+            log(f"Firebase atualizado: {criados} criados, {atualizados} atualizados, "
+                f"{devol_processadas} devolução(ões), {ignoradas} NF(s) já existiam")
         except Exception as e:
             log_erro("Erro ao salvar no Firebase", e)
     else:

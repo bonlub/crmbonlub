@@ -1836,6 +1836,20 @@ function verDadosCliente(id){
             </div>`).join('')}
         </div>
       </div>`:''}
+      ${c.devolucaoHistorico&&c.devolucaoHistorico.length?`<div class="frow full">
+        <label style="color:var(--p-text)">⚠ Devoluções Symplex (${c.devolucaoHistorico.length})</label>
+        <div style="max-height:180px;overflow-y:auto">
+          ${c.devolucaoHistorico.slice().reverse().map(d=>`
+            <div style="padding:8px 10px;background:var(--p-bg);border-radius:var(--radius);margin-bottom:5px;font-size:12px;border-left:3px solid var(--p-border)">
+              <div style="display:flex;justify-content:space-between;margin-bottom:3px">
+                <span style="font-weight:600;color:var(--p-text);font-family:var(--mono)">Dev. #${esc(d.sqn)}</span>
+                <span style="font-family:var(--mono);color:var(--p-text);font-weight:600">${fmt(d.valor)}</span>
+              </div>
+              <div style="font-size:10px;color:var(--text3);margin-bottom:${d.motivo?'4px':'0'}">${d.data}</div>
+              ${d.motivo?`<div style="font-size:11px;color:var(--p-text)">${esc(d.motivo)}</div>`:''}
+            </div>`).join('')}
+        </div>
+      </div>`:''}
     </div>
     <div class="modal-actions">
       <button class="btn-outline" onclick="fecharModal()">Fechar</button>
