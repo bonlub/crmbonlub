@@ -1005,6 +1005,7 @@ async function carregarDoFirebase(){
       if(d.deals){ deals=JSON.parse(d.deals); }
       if(d.tarefas){ tarefas=JSON.parse(d.tarefas); }
       if(d.config){ CONFIG=Object.assign({},CONFIG,JSON.parse(d.config)); localStorage.setItem('crm7_config',JSON.stringify(CONFIG)); }
+      if(d.nfceTotais) try{ CONFIG.nfceTotais=JSON.parse(d.nfceTotais); }catch(e){}
       clientes.forEach(c=>{ if(c.cnpj) c.cnpj=c.cnpj.replace(/\D/g,''); if(c.ie) c.ie=c.ie.replace(/\D/g,''); });
       limparDadosDeOutrosVendedores();
       saveLocal();
@@ -4053,6 +4054,7 @@ function carregarFirebase(){
       if(d.deals){ deals=JSON.parse(d.deals); }
       if(d.tarefas){ tarefas=JSON.parse(d.tarefas); }
       if(d.config){ CONFIG=Object.assign({},CONFIG,JSON.parse(d.config)); localStorage.setItem('crm7_config',JSON.stringify(CONFIG)); }
+      if(d.nfceTotais) try{ CONFIG.nfceTotais=JSON.parse(d.nfceTotais); }catch(e){}
       clientes.forEach(c=>{ if(c.cnpj) c.cnpj=c.cnpj.replace(/\D/g,''); if(c.ie) c.ie=c.ie.replace(/\D/g,''); });
       saveLocal();
       firebaseOk=true;
