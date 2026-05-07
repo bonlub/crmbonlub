@@ -440,9 +440,11 @@ tbody tr:hover td{background:var(--surface2);}
         <span style="font-size:11px;color:var(--text3)">até</span>
         <input type="date" id="dash-ate" onchange="renderDashboard()" style="width:130px">
         <button class="btn-sm" style="font-size:11px" onclick="document.getElementById('dash-de').value='';document.getElementById('dash-ate').value='';renderDashboard()">Todos</button>
+        <select id="dash-vend" onchange="renderDashboard()" style="width:140px;display:none"></select>
         <div id="dash-scope-info" style="font-size:12px;color:var(--text3);margin-left:8px"></div>
       </div>
       <div class="funnel-row" id="funnel-row"></div>
+      <div id="dash-minha-meta" style="display:none;margin-bottom:1.25rem"></div>
       <div class="dash-section-title">Ranking de vendedores</div>
       <div class="table-wrap" style="margin-bottom:1.25rem">
         <div class="rank-row" style="background:var(--surface2)">
@@ -991,6 +993,8 @@ async function syncRemote(){
 
 async function carregarDoFirebase(){
   try{
+    // Contar pendências atuais antes de sincronizar (para detectar novas)
+    const _pendAntes=CFG.nome?(CONFIG.symplexPendencias||[]).filter(p=>!p.revisado&&(CFG.role==='gestor'||nomeVendedor(p.vendedor||'',CFG.nome))).length:0;
     const ref=db.collection('crm').doc('dados');
     const doc=await ref.get({ source: 'server' });
     if(doc.exists){
@@ -1003,6 +1007,12 @@ async function carregarDoFirebase(){
       clientes.forEach(c=>{ if(c.cnpj) c.cnpj=c.cnpj.replace(/\D/g,''); if(c.ie) c.ie=c.ie.replace(/\D/g,''); });
       limparDadosDeOutrosVendedores();
       saveLocal();
+      // Notificar se chegaram novas pendências Symplex para o usuário atual
+      if(CFG.nome){
+        const _pendDepois=(CONFIG.symplexPendencias||[]).filter(p=>!p.revisado&&(CFG.role==='gestor'||nomeVendedor(p.vendedor||'',CFG.nome))).length;
+        const novas=_pendDepois-_pendAntes;
+        if(novas>0) toast(`${novas} nova${novas>1?'s':''} pendência${novas>1?'s':''} Symplex para revisar!`,'ok');
+      }
       return true;
     }
   }catch(e){ console.log('Firebase load error:',e); }
@@ -1017,7 +1027,7 @@ function limparDadosDeOutrosVendedores(){
     const c=clientes.find(x=>x.id===d.clienteId);
     if(!c) return true;
     // Se cliente tem vendedor e não é o usuário atual, remove o deal
-    if(c.vendedor && c.vendedor!==CFG.nome) return false;
+    if(c.vendedor && !nomeVendedor(c.vendedor,CFG.nome)) return false;
     return true;
   });
   // Remove tarefas cujo cliente está vinculado a outro vendedor
@@ -1025,7 +1035,7 @@ function limparDadosDeOutrosVendedores(){
     if(t.vendedor!==CFG.nome) return true; // tarefa de outro, não mexe
     const c=clientes.find(x=>x.id===t.clienteId);
     if(!c) return true;
-    if(c.vendedor && c.vendedor!==CFG.nome) return false;
+    if(c.vendedor && !nomeVendedor(c.vendedor,CFG.nome)) return false;
     return true;
   });
 }
@@ -2302,14 +2312,32 @@ function verHistCliente(id){
 function renderDashboard(){
   const de=document.getElementById('dash-de')?.value||'';
   const ate=document.getElementById('dash-ate')?.value||'';
+
+  // Filtro de vendedor (gestor e gerente)
+  const dashVendEl=document.getElementById('dash-vend');
+  if(dashVendEl){
+    if(CFG.role==='gestor'||CFG.role==='gerente'){
+      dashVendEl.style.display='';
+      if(dashVendEl.options.length<=1){
+        const vl=CFG.role==='gestor'?usuarios.filter(u=>u.role!=='gestor'):usuarios.filter(u=>meuGrupo().includes(u.nome));
+        // limpar e repopular
+        while(dashVendEl.options.length>1) dashVendEl.remove(1);
+        vl.sort((a,b)=>a.nome.localeCompare(b.nome)).forEach(u=>{const o=document.createElement('option');o.value=u.nome;o.textContent=u.nome;dashVendEl.appendChild(o);});
+      }
+    } else { dashVendEl.style.display='none'; }
+  }
+  const filtroVend=dashVendEl?dashVendEl.value:'';
+
   const scope=deals.filter(d=>{
     if(!dealVisivel(d)) return false;
     if(de&&d.data<de) return false;
     if(ate&&d.data>ate) return false;
+    if(filtroVend&&d.vendedor!==filtroVend) return false;
     return true;
   });
   const info=document.getElementById('dash-scope-info');
-  if(CFG.role==='gerente'){ const g=meuGrupo(); info.textContent='Grupo: '+g.join(', '); } else info.textContent='';
+  if(filtroVend){ info.textContent='Vendedor: '+filtroVend; }
+  else if(CFG.role==='gerente'){ const g=meuGrupo(); info.textContent='Grupo: '+g.join(', '); } else info.textContent='';
 
   // Funil
   const tots={}; ETAPAS.forEach(e=>{tots[e]={n:0,val:0};});
@@ -2321,12 +2349,40 @@ function renderDashboard(){
     <div class="funnel-col-sub">${fmt(tots[e].val)}</div>
   </div>`).join('');
 
+  // Card "Minha Meta" para vendedores ou quando gestor/gerente filtra por vendedor
+  const metaEl=document.getElementById('dash-minha-meta');
+  if(metaEl){
+    const nomeAlvo=CFG.role==='vendedor'?CFG.nome:filtroVend;
+    if(nomeAlvo){
+      const uAlvo=usuarios.find(x=>x.nome===nomeAlvo);
+      const metaVal=uAlvo?.meta||0;
+      const valAlvo=scope.filter(d=>d.vendedor===nomeAlvo&&d.etapa==='ganho').reduce((a,d)=>a+Number(d.valor||0),0);
+      const vendasAlvo=scope.filter(d=>d.vendedor===nomeAlvo&&d.etapa==='ganho').length;
+      const pctMeta=metaVal>0?Math.min(100,Math.round(valAlvo/metaVal*100)):0;
+      const cor=pctMeta>=100?'var(--g-dot)':pctMeta>=60?'var(--o-dot)':'var(--p-dot)';
+      metaEl.style.display='';
+      metaEl.innerHTML=`<div style="background:var(--surface2);border:0.5px solid var(--border);border-radius:var(--radius-lg);padding:14px 16px;display:flex;flex-wrap:wrap;gap:16px;align-items:center">
+        <div style="flex:1;min-width:200px">
+          <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text3);margin-bottom:4px">${CFG.role==='vendedor'?'Minha Meta':'Meta — '+esc(nomeAlvo)}</div>
+          ${metaVal>0?`<div style="font-size:20px;font-weight:700;font-family:var(--mono)">${pctMeta}% <span style="font-size:12px;font-weight:400;color:var(--text3)">de ${fmt(metaVal)}</span></div>
+          <div class="meta-bar-wrap" style="margin-top:6px;height:8px"><div class="meta-bar" style="width:${pctMeta}%;background:${cor};height:8px;border-radius:4px"></div></div>`
+          :`<div style="font-size:13px;color:var(--text3)">Sem meta definida — configure em Equipe</div>`}
+        </div>
+        <div style="display:flex;gap:16px">
+          <div style="text-align:center"><div style="font-size:20px;font-weight:700;color:var(--g-text)">${vendasAlvo}</div><div style="font-size:10px;color:var(--text3);text-transform:uppercase">Vendas</div></div>
+          <div style="text-align:center"><div style="font-size:20px;font-weight:700;font-family:var(--mono)">${fmt(valAlvo)}</div><div style="font-size:10px;color:var(--text3);text-transform:uppercase">Valor ganho</div></div>
+        </div>
+      </div>`;
+    } else { metaEl.style.display='none'; }
+  }
+
   // Ranking — usa todos os deals do período (sem filtro de visibilidade) para que vendedor veja todos
   const vmap={};
   const scopeRank=deals.filter(d=>{
     if(CFG.role==='gerente'&&!meuGrupo().includes(d.vendedor)) return false;
     if(de&&d.data<de) return false;
     if(ate&&d.data>ate) return false;
+    if(filtroVend&&d.vendedor!==filtroVend) return false;
     return true;
   });
   scopeRank.forEach(d=>{
@@ -3014,10 +3070,14 @@ function carregarConfig(){
 function salvarConfig(){
   const di=parseInt(document.getElementById('cfg-dias-inativo').value)||90;
   const dv=parseInt(document.getElementById('cfg-dias-vinculo').value)||90;
+  const changes=[];
+  if(CONFIG.diasInativo!==di) changes.push(`Inatividade: ${CONFIG.diasInativo}d → ${di}d`);
+  if(CONFIG.diasVinculo!==dv) changes.push(`Vínculo: ${CONFIG.diasVinculo}d → ${dv}d`);
   CONFIG.diasInativo=di; CONFIG.diasVinculo=dv;
   localStorage.setItem('crm7_config',JSON.stringify(CONFIG));
   document.getElementById('cfg-dias-label').textContent=di;
   syncRemote();
+  if(changes.length) registrarLog('config','Configuração alterada',changes.join(' | '));
   toast('Configurações salvas!','ok');
 }
 
@@ -3062,6 +3122,7 @@ function salvarRestricaoHorario(){
   CONFIG.restricaoHorario={ini,fim,roles};
   localStorage.setItem('crm7_config',JSON.stringify(CONFIG));
   syncRemote();
+  registrarLog('config','Restrição de horário alterada',ini&&fim?`${ini}–${fim} para ${roles}`:'removida');
   const st=document.getElementById('cfg-hora-status');
   if(st) st.innerHTML=ini&&fim?`<span style="color:var(--g-text)">✓ Restrição ativa: ${ini} às ${fim} para ${roles}</span>`:`<span style="color:var(--text3)">Sem restrição configurada.</span>`;
   toast('Restrição de horário salva!','ok');
@@ -3739,6 +3800,14 @@ function renderPendencias(){
   const revisados=pendsFiltradas.filter(p=>p.revisado);
 
   let html='';
+  // Alerta gestor: vendedores do Symplex que não estão cadastrados no CRM
+  if(CFG.role==='gestor'){
+    const semCadastro=pends.filter(p=>!p.revisado&&p.vendedor&&!usuarios.find(u=>nomeVendedor(u.nome,p.vendedor)));
+    if(semCadastro.length){
+      const nomes=[...new Set(semCadastro.map(p=>p.vendedor))].join(', ');
+      html+=`<div style="background:var(--o-bg);border:0.5px solid var(--o-border);border-radius:var(--radius);padding:10px 14px;margin-bottom:10px;font-size:12px;color:var(--o-text)">⚠️ Vendedor${semCadastro.length>1?'es':''} do Symplex não cadastrado${semCadastro.length>1?'s':''} no CRM: <strong>${esc(nomes)}</strong>. Cadastre-os em Equipe para que recebam as pendências.</div>`;
+    }
+  }
   if(novos.length){
     html+=`<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--c-text);margin-bottom:6px">Novos clientes criados (${novos.length}) — completar ou recusar cadastro</div>`;
     html+=novos.map(p=>{
