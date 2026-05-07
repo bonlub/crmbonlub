@@ -134,8 +134,11 @@ def set_ultimo_sync(ts):
 # ── Conexão SQL ───────────────────────────────────────────────────────────────
 
 def conectar_sql():
-    """Conecta no PostgreSQL do Symplex/Conttrade (dbCONTTRADE)."""
-    return psycopg2.connect(
+    """Conecta no PostgreSQL do Symplex/Conttrade (dbCONTTRADE) em modo SOMENTE LEITURA.
+    A sessão é marcada como readonly=True no nível do servidor PostgreSQL —
+    qualquer tentativa acidental de INSERT/UPDATE/DELETE levanta exceção imediatamente.
+    """
+    conn = psycopg2.connect(
         host=SQL.get('host', '127.0.0.1'),
         port=int(SQL.get('porta', 5432)),
         dbname=SQL['database'],
@@ -143,7 +146,10 @@ def conectar_sql():
         password=SQL['password'],
         connect_timeout=15,
         cursor_factory=psycopg2.extras.RealDictCursor,
+        options='-c default_transaction_read_only=on',
     )
+    conn.set_session(readonly=True, autocommit=True)
+    return conn
 
 # ── Consultas SQL (colunas reais do dbCONTTRADE) ──────────────────────────────
 
