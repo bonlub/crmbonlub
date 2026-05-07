@@ -117,10 +117,21 @@ def set_ultimo_sync(ts):
 
 # ── Conexão SQL ───────────────────────────────────────────────────────────────
 
+def _montar_server():
+    """Monta a string SERVER do pyodbc a partir de host, porta e instancia."""
+    host  = SQL.get('host', SQL.get('server', 'localhost'))
+    porta = SQL.get('porta', 1433)
+    inst  = (SQL.get('instancia') or '').strip()
+    if inst:
+        # Instância nomeada: host\instancia  (porta ignorada, SQL Browser resolve)
+        return f"{host}\\{inst}"
+    # Porta explícita: host,porta
+    return f"{host},{porta}"
+
 def conectar_sql():
     conn_str = (
-        f"DRIVER={{{SQL['driver']}}};"
-        f"SERVER={SQL['server']};"
+        f"DRIVER={{{SQL.get('driver', 'ODBC Driver 17 for SQL Server')}}};"
+        f"SERVER={_montar_server()};"
         f"DATABASE={SQL['database']};"
         f"UID={SQL['user']};"
         f"PWD={SQL['password']};"

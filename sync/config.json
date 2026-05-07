@@ -1,8 +1,10 @@
 {
-  "_comentario": "Preencha todos os campos antes de rodar o sync.py",
+  "_comentario": "Use o script configurar.bat para alterar IP, porta e senha sem editar este arquivo manualmente.",
 
   "sql": {
-    "server":   "SEU_SERVIDOR\\INSTANCIA",
+    "host":     "192.168.1.100",
+    "porta":    1433,
+    "instancia": "",
     "database": "NOME_DO_BANCO_SYMPLEX",
     "user":     "usuario_sql",
     "password": "senha_sql",
